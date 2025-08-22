@@ -4,11 +4,12 @@ This module provides email notification functionality for renewal success,
 failure, and other events using SMTP.
 """
 
+import inspect
 import smtplib
 import ssl
 from datetime import date, timedelta
 from email.message import EmailMessage
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from ..core.models import AccountBalance, RenewalResult
 from ..utils.config import NotificationConfig, SmtpConfig
@@ -38,7 +39,7 @@ class EmailNotifier:
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit - close SMTP connection."""
         self.disconnect()
 
@@ -137,37 +138,19 @@ class EmailNotifier:
         # Calculate next renewal date (typically 30 days from today)
         next_renewal = date.today() + timedelta(days=30)
 
-        body_parts = [
-            f"Hi there,",
-            f"",
-            f"Great news! Your Tello account ({email}) was renewed successfully.",
-            f"",
-        ]
+        body_template = f"""Hi there,
 
-        if result.new_balance:
-            body_parts.extend(
-                [
-                    f"Your new account balance:",
-                    f"• Data: {result.new_balance.data}",
-                    f"• Minutes: {result.new_balance.minutes}",
-                    f"• Texts: {result.new_balance.texts}",
-                    f"",
-                ]
-            )
+Great news! Your Tello account ({email}) was renewed successfully.
 
-        body_parts.extend(
-            [
-                f"Renewal completed at: {result.timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
-                f"Next renewal scheduled for: {next_renewal.strftime('%B %d, %Y')}",
-                f"",
-                f"You don't need to take any action. Your service will continue uninterrupted.",
-                f"",
-                f"Best regards,",
-                f"Tello Auto-Renewal System",
-            ]
-        )
+{self._format_balance_info(result.new_balance) if result.new_balance else ""}Renewal completed at: {result.timestamp.strftime("%Y-%m-%d %H:%M:%S")}
+Next renewal scheduled for: {next_renewal.strftime("%B %d, %Y")}
 
-        body = "\n".join(body_parts)
+You don't need to take any action. Your service will continue uninterrupted.
+
+Best regards,
+Tello Auto-Renewal System"""
+
+        body = inspect.cleandoc(body_template)
 
         message = self._create_message(
             subject, body, self.notification_config.recipients
@@ -194,26 +177,24 @@ class EmailNotifier:
 
         subject = "❌ Tello Plan Renewal Failed - Action Required"
 
-        body_parts = [
-            f"Hi there,",
-            f"",
-            f"Unfortunately, your Tello account ({email}) failed to renew automatically.",
-            f"",
-            f"Error details:",
-            f"{error}",
-            f"",
-            f"IMPORTANT: Please log in to your Tello account and complete the renewal manually",
-            f"as soon as possible to avoid service interruption.",
-            f"",
-            f"Login here: https://tello.com/account/login",
-            f"",
-            f"If you continue to experience issues, please contact Tello customer support.",
-            f"",
-            f"Best regards,",
-            f"Tello Auto-Renewal System",
-        ]
+        body_template = f"""Hi there,
 
-        body = "\n".join(body_parts)
+Unfortunately, your Tello account ({email}) failed to renew automatically.
+
+Error details:
+{error}
+
+IMPORTANT: Please log in to your Tello account and complete the renewal manually
+as soon as possible to avoid service interruption.
+
+Login here: https://tello.com/account/login
+
+If you continue to experience issues, please contact Tello customer support.
+
+Best regards,
+Tello Auto-Renewal System"""
+
+        body = inspect.cleandoc(body_template)
 
         message = self._create_message(
             subject, body, self.notification_config.recipients
@@ -240,22 +221,20 @@ class EmailNotifier:
 
         subject = f"ℹ️ Tello Renewal Check - {days_until} Days Remaining"
 
-        body_parts = [
-            f"Hi there,",
-            f"",
-            f"This is a status update for your Tello account ({email}).",
-            f"",
-            f"Your plan renewal is not yet due. You have {days_until} days remaining",
-            f"before the next renewal is required.",
-            f"",
-            f"The auto-renewal system will automatically renew your plan when it's due.",
-            f"No action is required from you at this time.",
-            f"",
-            f"Best regards,",
-            f"Tello Auto-Renewal System",
-        ]
+        body_template = f"""Hi there,
 
-        body = "\n".join(body_parts)
+This is a status update for your Tello account ({email}).
+
+Your plan renewal is not yet due. You have {days_until} days remaining
+before the next renewal is required.
+
+The auto-renewal system will automatically renew your plan when it's due.
+No action is required from you at this time.
+
+Best regards,
+Tello Auto-Renewal System"""
+
+        body = inspect.cleandoc(body_template)
 
         message = self._create_message(
             subject, body, self.notification_config.recipients
@@ -274,24 +253,22 @@ class EmailNotifier:
 
         subject = "🧪 Tello Auto-Renewal Test Email"
 
-        body_parts = [
-            f"Hi there,",
-            f"",
-            f"This is a test email from the Tello Auto-Renewal system.",
-            f"",
-            f"If you're receiving this message, your email configuration is working correctly.",
-            f"",
-            f"Configuration details:",
-            f"• SMTP Server: {self.smtp_config.server}:{self.smtp_config.port}",
-            f"• From Address: {self.smtp_config.from_email}",
-            f"• TLS Enabled: {self.smtp_config.use_tls}",
-            f"• Recipients: {', '.join(self.notification_config.recipients)}",
-            f"",
-            f"Best regards,",
-            f"Tello Auto-Renewal System",
-        ]
+        body_template = f"""Hi there,
 
-        body = "\n".join(body_parts)
+This is a test email from the Tello Auto-Renewal system.
+
+If you're receiving this message, your email configuration is working correctly.
+
+Configuration details:
+• SMTP Server: {self.smtp_config.server}:{self.smtp_config.port}
+• From Address: {self.smtp_config.from_email}
+• TLS Enabled: {self.smtp_config.use_tls}
+• Recipients: {", ".join(self.notification_config.recipients)}
+
+Best regards,
+Tello Auto-Renewal System"""
+
+        body = inspect.cleandoc(body_template)
 
         message = self._create_message(
             subject, body, self.notification_config.recipients
@@ -315,29 +292,44 @@ class EmailNotifier:
 
         subject = f"⏰ Tello Renewal Reminder - {days_until} Days Until Renewal"
 
-        body_parts = [
-            f"Hi there,",
-            f"",
-            f"This is a friendly reminder about your upcoming Tello plan renewal.",
-            f"",
-            f"Account: {email}",
-            f"Days until renewal: {days_until}",
-            f"",
-            f"The auto-renewal system will automatically handle the renewal when it's due.",
-            f"Please ensure your payment method is up to date in your Tello account.",
-            f"",
-            f"Login here: https://tello.com/account/login",
-            f"",
-            f"Best regards,",
-            f"Tello Auto-Renewal System",
-        ]
+        body_template = f"""Hi there,
 
-        body = "\n".join(body_parts)
+This is a friendly reminder about your upcoming Tello plan renewal.
+
+Account: {email}
+Days until renewal: {days_until}
+
+The auto-renewal system will automatically handle the renewal when it's due.
+Please ensure your payment method is up to date in your Tello account.
+
+Login here: https://tello.com/account/login
+
+Best regards,
+Tello Auto-Renewal System"""
+
+        body = inspect.cleandoc(body_template)
 
         message = self._create_message(
             subject, body, self.notification_config.recipients
         )
         self._send_message(message)
+
+    def _format_balance_info(self, balance: AccountBalance) -> str:
+        """Format account balance information for email display.
+
+        Args:
+            balance: Account balance information
+
+        Returns:
+            Formatted balance string with proper indentation
+        """
+        balance_template = f"""Your new account balance:
+• Data: {balance.data}
+• Minutes: {balance.minutes}
+• Texts: {balance.texts}
+
+"""
+        return inspect.cleandoc(balance_template) + "\n\n"
 
 
 def create_email_notifier(
