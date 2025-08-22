@@ -5,6 +5,7 @@ This module provides a simplified command-line interface using argparse.
 
 import argparse
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +16,8 @@ from ..utils.config import Config, create_example_config, get_settings
 from ..utils.logging import configure_logging, get_logger
 
 logger = get_logger(__name__)
+# Type alias for argparse.Namespace
+Args = argparse.Namespace
 
 
 def setup_logging_and_config(config_path: Optional[str], verbose: bool) -> Config:
@@ -51,7 +54,7 @@ def setup_logging_and_config(config_path: Optional[str], verbose: bool) -> Confi
         sys.exit(1)
 
 
-def cmd_renew(args):
+def cmd_renew(args: Args) -> None:
     """Execute plan renewal."""
     config = setup_logging_and_config(args.config, args.verbose)
 
@@ -107,7 +110,7 @@ def cmd_renew(args):
         sys.exit(1)
 
 
-def cmd_status(args):
+def cmd_status(args: Args) -> None:
     """Check account status and renewal information."""
     config = setup_logging_and_config(args.config, args.verbose)
 
@@ -149,7 +152,7 @@ def cmd_status(args):
         sys.exit(1)
 
 
-def cmd_email_test(args):
+def cmd_email_test(args: Args) -> None:
     """Send test email notification."""
     config = setup_logging_and_config(args.config, args.verbose)
 
@@ -174,9 +177,16 @@ def cmd_email_test(args):
         sys.exit(1)
 
 
-def cmd_config_init(args):
+def cmd_config_init(args: Args) -> None:
     """Create example configuration file."""
     output = Path(args.output)
+
+    # If using default output, create directories if needed
+    if args.output == "config.toml" and not output.parent.exists():
+        # Check if we should create in a standard location
+        if not output.exists():
+            # Create parent directories if needed
+            output.parent.mkdir(parents=True, exist_ok=True)
 
     if output.exists():
         response = input(
@@ -187,18 +197,28 @@ def cmd_config_init(args):
             return
 
     try:
+        # Create parent directories if they don't exist
+        output.parent.mkdir(parents=True, exist_ok=True)
+
         create_example_config(output)
         print(f"Example configuration created: {output}")
         print(
             "Please edit the configuration file with your settings before running renewal."
         )
+        print("\nThe configuration will be automatically found in this location.")
+        print("You can also place it in:")
+        print(
+            "  - Current directory: config.toml, tello_renewal.toml, or tello-renewal.toml"
+        )
+        print("  - ~/.config/tello-renewal/config.toml")
+        print("  - .tello-renewal/config.toml")
 
     except Exception as e:
         print(f"Error creating configuration: {e}", file=sys.stderr)
         sys.exit(1)
 
 
-def cmd_config_validate(args):
+def cmd_config_validate(args: Args) -> None:
     """Validate configuration file."""
     try:
         config = setup_logging_and_config(args.config, args.verbose)
@@ -220,7 +240,7 @@ def cmd_config_validate(args):
         sys.exit(2)
 
 
-def create_parser():
+def create_parser() -> argparse.ArgumentParser:
     """Create and configure argument parser."""
     parser = argparse.ArgumentParser(
         description="Tello mobile plan automatic renewal system"
@@ -280,14 +300,14 @@ def create_parser():
     return parser
 
 
-def create_cli():
+def create_cli() -> Callable[[], None]:
     """Create and return the CLI function for compatibility.
 
     Returns:
         Callable that runs the CLI
     """
 
-    def cli():
+    def cli() -> None:
         parser = create_parser()
         args = parser.parse_args()
 
@@ -300,7 +320,7 @@ def create_cli():
     return cli
 
 
-def main():
+def main() -> None:
     """Main CLI entry point."""
     cli = create_cli()
     cli()
