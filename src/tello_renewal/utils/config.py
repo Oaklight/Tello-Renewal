@@ -8,7 +8,7 @@ import sys
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,7 +33,7 @@ class TelloConfig(BaseModel):
 
     @field_validator("card_expiration", mode="before")
     @classmethod
-    def parse_card_expiration(cls, value) -> date:
+    def parse_card_expiration(cls, value: Any) -> date:
         """Parse various card expiration date formats.
 
         Supports formats like:
@@ -248,7 +248,7 @@ class Config(BaseSettings):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 
-def load_toml_config(config_path: Path) -> dict:
+def load_toml_config(config_path: Path) -> dict[str, Any]:
     """Load configuration from TOML file.
 
     Args:
@@ -276,7 +276,7 @@ def get_settings(config_path: Optional[str] = None) -> Config:
     """Load and cache configuration settings.
 
     Args:
-        config_path: Path to configuration file (defaults to config.toml)
+        config_path: Path to configuration file (defaults to searching in multiple locations)
 
     Returns:
         Validated configuration object
@@ -286,11 +286,24 @@ def get_settings(config_path: Optional[str] = None) -> Config:
         ValueError: If configuration is invalid
     """
     if config_path is None:
-        # Look for config file in common locations
+        # Look for config file in specified order:
+        # 1. Current path
+        # 2. ~/.config/tello-renewal/
+        # 3. .tello-renewal/
+        home_dir = Path.home()
         possible_paths = [
+            # Current path - try multiple common config file names
             Path("config.toml"),
-            Path("config/config.toml"),
             Path("tello_renewal.toml"),
+            Path("tello-renewal.toml"),
+            # ~/.config/tello-renewal/
+            home_dir / ".config" / "tello-renewal" / "config.toml",
+            home_dir / ".config" / "tello-renewal" / "tello_renewal.toml",
+            home_dir / ".config" / "tello-renewal" / "tello-renewal.toml",
+            # .tello-renewal/ (relative to current directory)
+            Path(".tello-renewal") / "config.toml",
+            Path(".tello-renewal") / "tello_renewal.toml",
+            Path(".tello-renewal") / "tello-renewal.toml",
         ]
 
         config_file = None
