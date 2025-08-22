@@ -7,16 +7,16 @@ sensitive data redaction and easy configuration.
 import re
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from loguru import logger
 
 from .config import LoggingConfig
 
 
-def _redact_sensitive_data(record: dict) -> bool:
+def _redact_sensitive_data(record: Any) -> bool:
     """Redact sensitive information from log messages."""
-    message = record["message"]
+    message: str = record["message"]
 
     # Patterns to redact sensitive information
     patterns = [
@@ -78,7 +78,7 @@ def configure_logging(config: Optional[LoggingConfig] = None) -> None:
     logger.disable("urllib3")
 
 
-def get_logger(name: str):
+def get_logger(name: str) -> Any:
     """Get a logger with the specified name.
 
     Args:
@@ -92,7 +92,7 @@ def get_logger(name: str):
 
 
 # Convenience functions
-def log_function_call(func_name: str, **kwargs) -> None:
+def log_function_call(func_name: str, **kwargs: Any) -> None:
     """Log function call with parameters (sensitive data will be redacted).
 
     Args:
@@ -104,7 +104,9 @@ def log_function_call(func_name: str, **kwargs) -> None:
 
 
 # Legacy compatibility function for old signature
-def log_function_call_legacy(logger_instance, func_name: str, **kwargs) -> None:
+def log_function_call_legacy(
+    logger_instance: Any, func_name: str, **kwargs: Any
+) -> None:
     """Legacy compatibility for log_function_call with logger parameter."""
     log_function_call(func_name, **kwargs)
 

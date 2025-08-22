@@ -6,7 +6,8 @@ for interacting with the Tello website and orchestrating the renewal process.
 
 import time
 from datetime import date, datetime
-from typing import Optional, TYPE_CHECKING
+from types import TracebackType
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -22,6 +23,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.edge.options import Options as EdgeOptions
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
@@ -81,7 +83,12 @@ class TelloWebClient:
         self._initialize_driver()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         """Context manager exit - cleanup browser."""
         self._cleanup_driver()
 
@@ -146,9 +153,7 @@ class TelloWebClient:
             finally:
                 self._driver = None
 
-    def _wait_for_element(
-        self, by: By, value: str, timeout: int = 30
-    ) -> webdriver.remote.webelement.WebElement:
+    def _wait_for_element(self, by: str, value: str, timeout: int = 30) -> WebElement:
         """Wait for element to be present and return it.
 
         Args:
@@ -162,6 +167,9 @@ class TelloWebClient:
         Raises:
             ElementNotFoundError: If element is not found within timeout
         """
+        if self._driver is None:
+            raise ElementNotFoundError("Driver not initialized")
+
         try:
             element = WebDriverWait(self._driver, timeout).until(
                 EC.presence_of_element_located((by, value))
@@ -178,6 +186,9 @@ class TelloWebClient:
         """
         login_url = f"{base_url.rstrip('/')}/account/login"
         log_function_call("open_login_page", url=login_url)
+
+        if self._driver is None:
+            raise TelloWebError("Driver not initialized")
 
         try:
             self._driver.get(login_url)
@@ -250,7 +261,9 @@ class TelloWebClient:
             return renewal_date
 
         except ValueError as e:
-            raise TelloWebError(f"Failed to parse renewal date '{date_text}': {e}")
+            # date_text is guaranteed to be defined here since we're in the try block
+            date_text_safe = locals().get("date_text", "unknown")
+            raise TelloWebError(f"Failed to parse renewal date '{date_text_safe}': {e}")
         except Exception as e:
             raise ElementNotFoundError(f"Failed to get renewal date: {e}")
 
@@ -263,6 +276,9 @@ class TelloWebClient:
         Raises:
             ElementNotFoundError: If balance elements not found
         """
+        if self._driver is None:
+            raise ElementNotFoundError("Driver not initialized")
+
         try:
             balance_elements = WebDriverWait(self._driver, 30).until(
                 EC.presence_of_all_elements_located(
@@ -353,9 +369,7 @@ class TelloWebClient:
         Raises:
             RenewalPageError: If form elements not found or filling fails
         """
-        log_function_call(
-            "fill_card_expiration", expiration_date=expiration_date
-        )
+        log_function_call("fill_card_expiration", expiration_date=expiration_date)
 
         try:
             # Fill expiration month

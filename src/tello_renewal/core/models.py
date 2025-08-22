@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from ..utils.logging import get_logger
 
@@ -163,7 +163,7 @@ class AccountBalance:
         """String representation of the account balance."""
         return f"{self.data}, {self.minutes}, {self.texts}"
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, str]:
         """Convert to dictionary representation."""
         return {
             "data": str(self.data),
@@ -188,9 +188,9 @@ class RenewalResult:
         """Check if the renewal was successful."""
         return self.status == RenewalStatus.SUCCESS
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""
-        result = {
+        result: Dict[str, Any] = {
             "status": self.status.value,
             "timestamp": self.timestamp.isoformat(),
             "message": self.message,
@@ -227,7 +227,7 @@ class AccountSummary:
         """Check if renewal is due (within 1 day)."""
         return self.days_until_renewal <= 1
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "email": self.email,
