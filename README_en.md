@@ -12,7 +12,7 @@ Automatic renewal system for Tello mobile plans using web automation.
 - ⚙️ TOML configuration with validation
 - 🔒 Secure credential handling
 - 📊 Comprehensive logging
-- 🐳 Docker support (planned)
+- 🐳 Docker support with reusable base images
 
 ## Installation
 
@@ -256,6 +256,36 @@ Check log files for detailed error information:
 
 ```bash
 tail -f tello_renewal.log
+```
+
+## Docker Usage
+
+For detailed Docker usage instructions, see [`docker/README_en.md`](docker/README_en.md) or [`docker/README_zh.md`](docker/README_zh.md).
+
+### Quick Docker Start
+
+```bash
+# Build and run with Docker
+make docker-build
+docker run --rm -v $(pwd)/config:/app/config oaklight/tello-renewal:latest
+
+# Or use the provided scripts
+./scripts/run.sh --help
+```
+
+### Available Docker Commands
+
+```bash
+# Build base image (Alpine Python + Selenium + geckodriver)
+make docker-build-base
+make docker-push-base
+
+# Build application image
+make docker-build
+make docker-push
+
+# Clean up
+make docker-clean
 ```
 
 ## Development

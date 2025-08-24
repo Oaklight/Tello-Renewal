@@ -12,7 +12,7 @@
 - ⚙️ TOML 配置文件及验证
 - 🔒 安全的凭据处理
 - 📊 全面的日志记录
-- 🐳 Docker 支持（计划中）
+- 🐳 Docker 支持，包含可重用基础镜像
 
 ## 安装
 
@@ -256,6 +256,36 @@ tello-renewal --verbose renew --dry-run
 
 ```bash
 tail -f tello_renewal.log
+```
+
+## Docker 使用
+
+详细的 Docker 使用说明请参见 [`docker/README_zh.md`](docker/README_zh.md) 或 [`docker/README_en.md`](docker/README_en.md)。
+
+### 快速 Docker 开始
+
+```bash
+# 使用 Docker 构建和运行
+make docker-build
+docker run --rm -v $(pwd)/config:/app/config oaklight/tello-renewal:latest
+
+# 或使用提供的脚本
+./scripts/run.sh --help
+```
+
+### 可用的 Docker 命令
+
+```bash
+# 构建基础镜像 (Alpine Python + Selenium + geckodriver)
+make docker-build-base
+make docker-push-base
+
+# 构建应用镜像
+make docker-build
+make docker-push
+
+# 清理
+make docker-clean
 ```
 
 ## 开发
