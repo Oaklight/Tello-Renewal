@@ -7,16 +7,15 @@
 ## 🐳 镜像特性
 
 - **基础镜像**: Alpine Linux (最小化)
-- **Python版本**: 3.11
+- **Python 版本**: 3.11
 - **浏览器**: Firefox + Geckodriver
-- **镜像大小**: ~150MB (预估)
-- **安全性**: 非root用户运行
-- **资源限制**: 内存512MB，CPU 0.5核
+- **镜像大小**: ~831MB (基础镜像)
+- **安全性**: 非 root 用户运行
+- **资源限制**: 内存 512MB，CPU 0.5 核
 
 ## 📋 前置要求
 
 - Docker 20.10+
-- Docker Compose 2.0+ (可选)
 - 至少 512MB 可用内存
 
 ## 🏗️ 基础镜像
@@ -46,7 +45,7 @@
 
 基础镜像包含以下 Python 包：
 
-- `selenium>=4.15.0` - Web 自动化框架
+- `selenium>=4.27.0` - Web 自动化框架
 
 #### 构建基础镜像
 
@@ -125,21 +124,35 @@ tello-renewal config-init --output config/config.toml
 nano config/config.toml
 ```
 
-### 3. 运行容器
+### 3. 下载并运行
 
 ```bash
-# 使用运行脚本 (推荐)
-./scripts/run.sh
+# 下载运行脚本
+curl -o run.sh https://raw.githubusercontent.com/Oaklight/Tello-Renewal/refs/heads/master/scripts/run.sh
+chmod +x run.sh
 
-# 或使用 docker-compose
-docker-compose up tello-renewal
+# 使用运行脚本 (推荐)
+./run.sh renew
 
 # 或直接使用 docker run
 docker run --rm \
-  -v $(pwd)/config:/app/config:ro \
-  -v $(pwd)/logs:/app/logs \
+  -v ~/.config/tello-renewal:/app/config:ro \
+  -v ./logs:/app/logs \
+  -e TZ=America/Chicago \
   oaklight/tello-renewal:latest \
   tello-renewal --config /app/config/config.toml renew
+```
+
+### 备用下载地址
+
+如果 GitHub 无法访问，可使用以下镜像地址：
+
+```bash
+# JSDelivr CDN
+curl -o run.sh https://cdn.jsdelivr.net/gh/Oaklight/Tello-Renewal@master/scripts/run.sh
+
+# JSDelivr 镜像
+curl -o run.sh https://cdn.jsdmirror.com/gh/Oaklight/Tello-Renewal@master/scripts/run.sh
 ```
 
 ## 📖 使用方法
@@ -148,48 +161,53 @@ docker run --rm \
 
 ```bash
 # 执行续费
-./scripts/run.sh
+./run.sh renew
 
 # 干运行模式 (测试)
-./scripts/run.sh --dry-run
+./run.sh renew --dry-run
 
 # 检查账户状态
-./scripts/run.sh --command status
+./run.sh status
 
 # 验证配置
-./scripts/run.sh --command config-validate
+./run.sh config-validate
 
 # 测试邮件通知
-./scripts/run.sh --command email-test
+./run.sh email-test
+
+# 创建示例配置
+./run.sh config-init --output ~/.config/tello-renewal/config.toml
 ```
 
-### Docker Compose 方式
+### 使用 Cron 定时任务
+
+使用系统 cron 设置自动续费：
 
 ```bash
-# 单次运行
-docker-compose up tello-renewal
+# 编辑 crontab
+crontab -e
 
-# 后台运行
-docker-compose up -d tello-renewal
+# 添加每日9点续费任务 (根据需要调整路径)
+0 9 * * * /path/to/run.sh renew >> /var/log/tello-renewal-cron.log 2>&1
 
-# 查看日志
-docker-compose logs -f tello-renewal
-
-# 停止容器
-docker-compose down
+# 或每周日9点续费
+0 9 * * 0 /path/to/run.sh renew >> /var/log/tello-renewal-cron.log 2>&1
 ```
 
-### 定时任务模式
+### 高级 Cron 设置
 
 ```bash
-# 启动定时任务 (每天9点运行)
-docker-compose --profile scheduler up -d tello-scheduler
+# 创建专用的 cron 脚本
+cat > /usr/local/bin/tello-renewal-cron.sh << 'EOF'
+#!/bin/bash
+cd /path/to/your/project
+./run.sh renew
+EOF
 
-# 自定义时间 (每天6点)
-CRON_SCHEDULE="0 6 * * *" docker-compose --profile scheduler up -d tello-scheduler
+chmod +x /usr/local/bin/tello-renewal-cron.sh
 
-# 查看定时任务日志
-docker-compose logs -f tello-scheduler
+# 添加到 crontab
+echo "0 9 * * * /usr/local/bin/tello-renewal-cron.sh" | crontab -
 ```
 
 ## ⚙️ 配置说明
@@ -198,23 +216,17 @@ docker-compose logs -f tello-scheduler
 
 ```
 project/
-├── config/
+├── ~/.config/tello-renewal/
 │   └── config.toml          # 主配置文件
 ├── logs/                    # 日志输出目录
-├── scripts/                 # 运行脚本
-├── docker-compose.yml       # Docker Compose 配置
-└── docker/
-    ├── Dockerfile          # 应用镜像定义
-    ├── base.Dockerfile     # 基础镜像定义
-    └── requirements.txt    # 基础依赖
+└── run.sh                   # 运行脚本
 ```
 
 ### 环境变量
 
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `TZ` | `America/Chicago` | 时区设置 |
-| `CRON_SCHEDULE` | `0 9 * * *` | 定时任务时间 |
+| 变量名        | 默认值                    | 说明         |
+| ------------- | ------------------------- | ------------ |
+| `TZ`          | `America/Chicago`         | 时区设置     |
 | `CONFIG_FILE` | `/app/config/config.toml` | 配置文件路径 |
 
 ### 配置文件示例
@@ -247,6 +259,7 @@ recipients = ["admin@example.com"]
 ### 常见问题
 
 1. **配置文件未找到**
+
    ```bash
    # 检查配置文件路径
    ls -la config/
@@ -254,9 +267,10 @@ recipients = ["admin@example.com"]
    ```
 
 2. **浏览器启动失败**
+
    ```bash
-   # 检查容器日志
-   docker-compose logs tello-renewal
+   # 检查日志目录
+   ls -la logs/
    # 确保有足够内存
    ```
 
@@ -287,15 +301,18 @@ docker run -it --rm \
 ## 🔒 安全建议
 
 1. **配置文件权限**
+
    ```bash
    chmod 600 config/config.toml  # 仅所有者可读写
    ```
 
 2. **使用应用密码**
+
    - Gmail: 使用应用专用密码
    - 避免使用主账户密码
 
 3. **网络隔离**
+
    ```yaml
    # docker-compose.yml 中添加
    networks:
@@ -320,21 +337,21 @@ docker run -it --rm \
 ### 健康检查
 
 ```bash
-# 检查容器状态
-docker-compose ps
+# 查看最近日志
+tail -f logs/tello_renewal.log
 
-# 查看健康状态
-docker inspect tello-renewal | grep Health -A 10
+# 查看 cron 日志
+tail -f /var/log/tello-renewal-cron.log
 ```
 
 ### 资源监控
 
 ```bash
-# 查看资源使用
-docker stats tello-renewal
+# 查看执行期间的 Docker 资源使用
+docker stats
 
-# 查看容器信息
-docker inspect tello-renewal
+# 检查系统资源
+htop
 ```
 
 ## 🔄 更新和维护
@@ -342,20 +359,19 @@ docker inspect tello-renewal
 ### 更新应用
 
 ```bash
-# 重新构建镜像
-make docker-build-base
-make docker-build
+# 拉取最新镜像
+docker pull oaklight/tello-renewal:latest
 
-# 重启容器
-docker-compose down
-docker-compose up -d tello-renewal
+# 更新运行脚本
+curl -o run.sh https://raw.githubusercontent.com/Oaklight/Tello-Renewal/refs/heads/master/scripts/run.sh
+chmod +x run.sh
 ```
 
 ### 备份配置
 
 ```bash
 # 备份配置和日志
-tar -czf tello-backup-$(date +%Y%m%d).tar.gz config/ logs/
+tar -czf tello-backup-$(date +%Y%m%d).tar.gz ~/.config/tello-renewal/ logs/
 ```
 
 ### 清理

@@ -9,14 +9,13 @@ This document describes how to use Docker to run the Tello Renewal system and pr
 - **Base Image**: Alpine Linux (minimal)
 - **Python Version**: 3.11
 - **Browser**: Firefox + Geckodriver
-- **Image Size**: ~150MB (estimated)
+- **Image Size**: ~831MB (base image)
 - **Security**: Non-root user execution
 - **Resource Limits**: 512MB memory, 0.5 CPU cores
 
 ## 📋 Prerequisites
 
 - Docker 20.10+
-- Docker Compose 2.0+ (optional)
 - At least 512MB available memory
 
 ## 🏗️ Base Images
@@ -46,7 +45,7 @@ The `base.Dockerfile` creates a reusable base image with:
 
 The base image includes this Python package:
 
-- `selenium>=4.15.0` - Web automation framework
+- `selenium>=4.27.0` - Web automation framework
 
 #### Building the Base Image
 
@@ -125,21 +124,35 @@ tello-renewal config-init --output config/config.toml
 nano config/config.toml
 ```
 
-### 3. Run Container
+### 3. Download and Run
 
 ```bash
-# Use run script (recommended)
-./scripts/run.sh
+# Download run script
+curl -o run.sh https://raw.githubusercontent.com/Oaklight/Tello-Renewal/refs/heads/master/scripts/run.sh
+chmod +x run.sh
 
-# Or use docker-compose
-docker-compose up tello-renewal
+# Use run script (recommended)
+./run.sh renew
 
 # Or use docker run directly
 docker run --rm \
-  -v $(pwd)/config:/app/config:ro \
-  -v $(pwd)/logs:/app/logs \
+  -v ~/.config/tello-renewal:/app/config:ro \
+  -v ./logs:/app/logs \
+  -e TZ=America/Chicago \
   oaklight/tello-renewal:latest \
   tello-renewal --config /app/config/config.toml renew
+```
+
+### Alternative Download URLs
+
+If GitHub is not accessible, use these mirror URLs:
+
+```bash
+# JSDelivr CDN
+curl -o run.sh https://cdn.jsdelivr.net/gh/Oaklight/Tello-Renewal@master/scripts/run.sh
+
+# JSDelivr Mirror
+curl -o run.sh https://cdn.jsdmirror.com/gh/Oaklight/Tello-Renewal@master/scripts/run.sh
 ```
 
 ## 📖 Usage
@@ -148,48 +161,53 @@ docker run --rm \
 
 ```bash
 # Execute renewal
-./scripts/run.sh
+./run.sh renew
 
 # Dry run mode (testing)
-./scripts/run.sh --dry-run
+./run.sh renew --dry-run
 
 # Check account status
-./scripts/run.sh --command status
+./run.sh status
 
 # Validate configuration
-./scripts/run.sh --command config-validate
+./run.sh config-validate
 
 # Test email notifications
-./scripts/run.sh --command email-test
+./run.sh email-test
+
+# Create example configuration
+./run.sh config-init --output ~/.config/tello-renewal/config.toml
 ```
 
-### Docker Compose Method
+### Scheduled Task with Cron
+
+Set up automatic renewal using system cron:
 
 ```bash
-# Single run
-docker-compose up tello-renewal
+# Edit crontab
+crontab -e
 
-# Background run
-docker-compose up -d tello-renewal
+# Add daily renewal at 9 AM (adjust path as needed)
+0 9 * * * /path/to/run.sh renew >> /var/log/tello-renewal-cron.log 2>&1
 
-# View logs
-docker-compose logs -f tello-renewal
-
-# Stop container
-docker-compose down
+# Or weekly renewal on Sundays at 9 AM
+0 9 * * 0 /path/to/run.sh renew >> /var/log/tello-renewal-cron.log 2>&1
 ```
 
-### Scheduled Task Mode
+### Advanced Cron Setup
 
 ```bash
-# Start scheduled task (runs daily at 9 AM)
-docker-compose --profile scheduler up -d tello-scheduler
+# Create a dedicated script for cron
+cat > /usr/local/bin/tello-renewal-cron.sh << 'EOF'
+#!/bin/bash
+cd /path/to/your/project
+./run.sh renew
+EOF
 
-# Custom time (daily at 6 AM)
-CRON_SCHEDULE="0 6 * * *" docker-compose --profile scheduler up -d tello-scheduler
+chmod +x /usr/local/bin/tello-renewal-cron.sh
 
-# View scheduled task logs
-docker-compose logs -f tello-scheduler
+# Add to crontab
+echo "0 9 * * * /usr/local/bin/tello-renewal-cron.sh" | crontab -
 ```
 
 ## ⚙️ Configuration
@@ -198,23 +216,17 @@ docker-compose logs -f tello-scheduler
 
 ```
 project/
-├── config/
+├── ~/.config/tello-renewal/
 │   └── config.toml          # Main configuration file
 ├── logs/                    # Log output directory
-├── scripts/                 # Run scripts
-├── docker-compose.yml       # Docker Compose configuration
-└── docker/
-    ├── Dockerfile          # Application image definition
-    ├── base.Dockerfile     # Base image definition
-    └── requirements.txt    # Base dependencies
+└── run.sh                   # Run script
 ```
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TZ` | `America/Chicago` | Timezone setting |
-| `CRON_SCHEDULE` | `0 9 * * *` | Scheduled task time |
+| Variable      | Default                   | Description             |
+| ------------- | ------------------------- | ----------------------- |
+| `TZ`          | `America/Chicago`         | Timezone setting        |
 | `CONFIG_FILE` | `/app/config/config.toml` | Configuration file path |
 
 ### Configuration File Example
@@ -247,6 +259,7 @@ recipients = ["admin@example.com"]
 ### Common Issues
 
 1. **Configuration file not found**
+
    ```bash
    # Check configuration file path
    ls -la config/
@@ -254,9 +267,10 @@ recipients = ["admin@example.com"]
    ```
 
 2. **Browser startup failure**
+
    ```bash
-   # Check container logs
-   docker-compose logs tello-renewal
+   # Check logs directory
+   ls -la logs/
    # Ensure sufficient memory
    ```
 
@@ -287,15 +301,18 @@ docker run -it --rm \
 ## 🔒 Security Recommendations
 
 1. **Configuration file permissions**
+
    ```bash
    chmod 600 config/config.toml  # Owner read/write only
    ```
 
 2. **Use app passwords**
+
    - Gmail: Use app-specific passwords
    - Avoid using main account passwords
 
 3. **Network isolation**
+
    ```yaml
    # Add to docker-compose.yml
    networks:
