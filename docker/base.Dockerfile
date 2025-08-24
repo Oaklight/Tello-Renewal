@@ -5,30 +5,22 @@ FROM python:3.11-alpine
 LABEL maintainer="oaklight"
 LABEL description="Alpine Python base image with Firefox and geckodriver for web automation"
 
-# Install runtime dependencies for Firefox and Selenium
+# Install runtime dependencies, geckodriver, and setup user in single layer
+ARG GECKODRIVER_VERSION=0.36.0
 RUN apk add --no-cache \
     firefox \
     dbus \
     ttf-freefont \
     wget \
-    && rm -rf /var/cache/apk/*
-
-# Install geckodriver
-ARG GECKODRIVER_VERSION=0.36.0
-RUN wget -q -O /tmp/geckodriver.tar.gz \
+    && wget -q -O /tmp/geckodriver.tar.gz \
     "https://github.com/mozilla/geckodriver/releases/download/v${GECKODRIVER_VERSION}/geckodriver-v${GECKODRIVER_VERSION}-linux64.tar.gz" \
     && tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin/ \
     && chmod +x /usr/local/bin/geckodriver \
-    && rm /tmp/geckodriver.tar.gz
-
-# Install basic Selenium and web automation dependencies
-COPY docker/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt \
-    && rm /tmp/requirements.txt
-
-# Create non-root user for security (common pattern)
-RUN addgroup -g 1000 appuser && \
-    adduser -D -s /bin/sh -u 1000 -G appuser appuser
+    && pip install --no-cache-dir selenium>=4.27.0 \
+    && addgroup -g 1000 appuser \
+    && adduser -D -s /bin/sh -u 1000 -G appuser appuser \
+    && apk del wget \
+    && rm -rf /tmp/* /var/cache/apk/*
 
 # Set environment variables for headless operation
 ENV DISPLAY=:99
