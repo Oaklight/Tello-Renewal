@@ -1,0 +1,2 @@
+# Basic Selenium dependencies for web automation
+selenium>=4.27.0

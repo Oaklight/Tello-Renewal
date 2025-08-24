@@ -57,7 +57,7 @@ echo "🐳 Building Tello Renewal Docker image..."
 echo "📦 Version: $VERSION"
 
 # Build the image with version tag
-docker build -t "${IMAGE_NAME}:${VERSION}" .
+docker build -f docker/Dockerfile -t "${IMAGE_NAME}:${VERSION}" .
 
 # Tag as latest
 docker tag "${IMAGE_NAME}:${VERSION}" "${IMAGE_NAME}:latest"
