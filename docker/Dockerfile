@@ -1,11 +1,5 @@
-# Multi-stage build for minimal image size
-FROM python:3.11-alpine AS builder
-
-# Install build dependencies
-RUN apk add --no-cache \
-    gcc \
-    musl-dev \
-    libffi-dev
+# Use our base image directly
+FROM oaklight/alpine-python-gecko:latest AS builder
 
 # Create virtual environment and install Python dependencies
 RUN python -m venv /opt/venv
