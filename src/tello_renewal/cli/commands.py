@@ -9,6 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
 
+from .. import __version__
 from ..core.models import RenewalStatus
 from ..core.renewer import RenewalEngine
 from ..notification.email import EmailNotifier
@@ -251,7 +252,9 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable verbose logging"
     )
-    parser.add_argument("--version", action="version", version="%(prog)s 1.0.0")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
 
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
