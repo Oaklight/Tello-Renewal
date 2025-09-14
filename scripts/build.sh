@@ -5,8 +5,8 @@ set -e
 
 # Function to get version from PyPI or fallback to pyproject.toml
 get_version() {
-    # Try to get version from PyPI first
-    PYPI_VERSION=$(python -c "
+	# Try to get version from PyPI first
+	PYPI_VERSION=$(python -c "
 import urllib.request
 import json
 import sys
@@ -17,22 +17,24 @@ try:
 except Exception:
     sys.exit(1)
 " 2>/dev/null)
-    
-    if [ $? -eq 0 ] && [ -n "$PYPI_VERSION" ]; then
-        echo "$PYPI_VERSION"
-    else
-        # Fallback to pyproject.toml
-        python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"
-    fi
+
+	if [ $? -eq 0 ] && [ -n "$PYPI_VERSION" ]; then
+		echo "$PYPI_VERSION"
+	else
+		# Fallback to pyproject.toml
+		python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"
+	fi
 }
 
 # Get version from argument or fetch from PyPI/pyproject.toml
 if [ -n "$1" ]; then
-    VERSION="$1"
-    echo "🔧 Using provided version: $VERSION"
+	VERSION="$1"
+	echo "🔧 Using provided version: $VERSION"
+	# When version is explicitly provided, pass it as build arg
+	BUILD_ARGS="--build-arg TELLO_VERSION=${VERSION}"
 else
-    VERSION=$(get_version)
-    PYPI_VERSION=$(python -c "
+	VERSION=$(get_version)
+	PYPI_VERSION=$(python -c "
 import urllib.request
 import json
 import sys
@@ -43,12 +45,16 @@ try:
 except Exception:
     pass
 " 2>/dev/null)
-    
-    if [ -n "$PYPI_VERSION" ]; then
-        echo "📦 Using PyPI version: $VERSION"
-    else
-        echo "⚠️  PyPI not available, using local version: $VERSION"
-    fi
+
+	if [ -n "$PYPI_VERSION" ]; then
+		echo "📦 Using latest PyPI version: $VERSION"
+		# Don't pass build arg, let Docker install latest from PyPI
+		BUILD_ARGS=""
+	else
+		echo "⚠️  PyPI not available, using local version: $VERSION"
+		# Pass the local version as build arg
+		BUILD_ARGS="--build-arg TELLO_VERSION=${VERSION}"
+	fi
 fi
 
 IMAGE_NAME="oaklight/tello-renewal"
@@ -56,8 +62,8 @@ IMAGE_NAME="oaklight/tello-renewal"
 echo "🐳 Building Tello Renewal Docker image..."
 echo "📦 Version: $VERSION"
 
-# Build the image with version tag
-docker build -f docker/Dockerfile -t "${IMAGE_NAME}:${VERSION}" .
+# Build the image with version tag, conditionally passing version as build argument
+docker build -f docker/Dockerfile $BUILD_ARGS -t "${IMAGE_NAME}:${VERSION}" .
 
 # Tag as latest
 docker tag "${IMAGE_NAME}:${VERSION}" "${IMAGE_NAME}:latest"

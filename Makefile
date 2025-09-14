@@ -39,6 +39,16 @@ docker-build:
 	@echo "Building Docker image $(DOCKER_IMAGE):$(VERSION) and $(DOCKER_IMAGE):latest..."
 	./scripts/build.sh $(VERSION)
 
+# Build Docker image with specific version
+docker-build-version:
+	@if [ -z "$(V)" ]; then \
+		echo "Error: Please specify version with V=<version>"; \
+		echo "Example: make docker-build-version V=0.1.1"; \
+		exit 1; \
+	fi
+	@echo "Building Docker image $(DOCKER_IMAGE):$(V) with specific version $(V)..."
+	./scripts/build.sh $(V)
+
 # Push base Docker image to DockerHub
 docker-push-base:
 	@echo "Pushing base Docker image $(BASE_IMAGE):latest to DockerHub..."
@@ -75,14 +85,15 @@ help:
 	@echo "  clean        - Clean up build and distribution files"
 	@echo ""
 	@echo "Docker targets:"
-	@echo "  docker-build-base - Build base Docker image with Alpine Python + geckodriver"
-	@echo "  docker-push-base  - Push base Docker image to DockerHub"
-	@echo "  docker-build      - Build Docker image using scripts/build.sh"
-	@echo "  docker-push       - Push Docker image to DockerHub"
-	@echo "  docker-run        - Show Docker run help"
-	@echo "  docker-clean      - Clean Docker images and containers"
+	@echo "  docker-build-base    - Build base Docker image with Alpine Python + geckodriver"
+	@echo "  docker-push-base     - Push base Docker image to DockerHub"
+	@echo "  docker-build         - Build Docker image using scripts/build.sh"
+	@echo "  docker-build-version - Build Docker image with specific version (use V=<version>)"
+	@echo "  docker-push          - Push Docker image to DockerHub"
+	@echo "  docker-run           - Show Docker run help"
+	@echo "  docker-clean         - Clean Docker images and containers"
 	@echo ""
 	@echo "General:"
 	@echo "  help         - Show this help message"
 
-.PHONY: all build push clean docker-build-base docker-push-base docker-build docker-push docker-run docker-clean help
+.PHONY: all build push clean docker-build-base docker-push-base docker-build docker-build-version docker-push docker-run docker-clean help
