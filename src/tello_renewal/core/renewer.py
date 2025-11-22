@@ -470,11 +470,44 @@ class TelloWebClient:
         """
         try:
             renew_button = self._wait_for_element(By.CSS_SELECTOR, "button#renew_plan")
-            renew_button.click()
-            logger.info("Clicked renew button, navigated to renewal page")
+
+            # Try multiple click strategies to handle element interception
+            try:
+                # First try regular click
+                renew_button.click()
+                logger.info("Clicked renew button using regular click")
+            except Exception as click_error:
+                logger.debug(f"Regular click failed: {click_error}")
+                try:
+                    # Try JavaScript click if regular click fails
+                    self._driver.execute_script("arguments[0].click();", renew_button)
+                    logger.info("Clicked renew button using JavaScript click")
+                except Exception as js_error:
+                    logger.debug(f"JavaScript click failed: {js_error}")
+                    try:
+                        # Try scrolling into view and then clicking
+                        self._driver.execute_script(
+                            "arguments[0].scrollIntoView(true);", renew_button
+                        )
+                        time.sleep(1)  # Wait for scroll to complete
+                        renew_button.click()
+                        logger.info("Clicked renew button after scrolling into view")
+                    except Exception as scroll_error:
+                        logger.debug(f"Scroll and click failed: {scroll_error}")
+                        # Final attempt: JavaScript click after scroll
+                        self._driver.execute_script(
+                            "arguments[0].scrollIntoView(true);", renew_button
+                        )
+                        time.sleep(1)
+                        self._driver.execute_script(
+                            "arguments[0].click();", renew_button
+                        )
+                        logger.info(
+                            "Clicked renew button using JavaScript after scroll"
+                        )
 
             # Wait for renewal page to load
-            time.sleep(2)
+            time.sleep(3)
 
         except Exception as e:
             raise ElementNotFoundError(f"Failed to open renewal page: {e}")
