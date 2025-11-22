@@ -105,10 +105,60 @@ class TelloWebClient:
                 options = FirefoxOptions()
                 if self.config.headless:
                     options.add_argument("--headless")
+
+                # Add container environment necessary parameters
+                options.add_argument("--no-sandbox")
+                options.add_argument("--disable-dev-shm-usage")
+                options.add_argument("--disable-gpu")
+                options.add_argument("--disable-setuid-sandbox")
+                options.add_argument("--disable-extensions")
+                options.add_argument("--disable-plugins")
+
                 options.add_argument(f"--width={self.config.window_size.split('x')[0]}")
                 options.add_argument(
                     f"--height={self.config.window_size.split('x')[1]}"
                 )
+
+                # Configure proxy if specified
+                if self.config.proxy_server:
+                    proxy_url = self.config.proxy_server
+                    logger.info(f"Configuring Firefox with proxy: {proxy_url}")
+
+                    # Set proxy preferences using Firefox profile
+                    profile = webdriver.FirefoxProfile()
+
+                    if self.config.proxy_type.lower() == "socks5":
+                        profile.set_preference("network.proxy.type", 1)
+                        proxy_parts = proxy_url.replace("socks5://", "").split(":")
+                        if len(proxy_parts) >= 2:
+                            profile.set_preference(
+                                "network.proxy.socks", proxy_parts[0]
+                            )
+                            profile.set_preference(
+                                "network.proxy.socks_port", int(proxy_parts[1])
+                            )
+                            profile.set_preference("network.proxy.socks_version", 5)
+                    else:
+                        # HTTP/HTTPS proxy
+                        profile.set_preference("network.proxy.type", 1)
+                        proxy_parts = (
+                            proxy_url.replace("http://", "")
+                            .replace("https://", "")
+                            .split(":")
+                        )
+                        if len(proxy_parts) >= 2:
+                            profile.set_preference("network.proxy.http", proxy_parts[0])
+                            profile.set_preference(
+                                "network.proxy.http_port", int(proxy_parts[1])
+                            )
+                            profile.set_preference("network.proxy.ssl", proxy_parts[0])
+                            profile.set_preference(
+                                "network.proxy.ssl_port", int(proxy_parts[1])
+                            )
+
+                    profile.update_preferences()
+                    options.profile = profile
+
                 self._driver = webdriver.Firefox(options=options)
 
             elif self.config.browser_type == "chrome":
@@ -118,6 +168,13 @@ class TelloWebClient:
                 options.add_argument(f"--window-size={self.config.window_size}")
                 options.add_argument("--no-sandbox")
                 options.add_argument("--disable-dev-shm-usage")
+
+                # Configure proxy if specified
+                if self.config.proxy_server:
+                    proxy_url = self.config.proxy_server
+                    logger.info(f"Configuring Chrome with proxy: {proxy_url}")
+                    options.add_argument(f"--proxy-server={proxy_url}")
+
                 self._driver = webdriver.Chrome(options=options)
 
             elif self.config.browser_type == "edge":
@@ -125,6 +182,13 @@ class TelloWebClient:
                 if self.config.headless:
                     options.add_argument("--headless")
                 options.add_argument(f"--window-size={self.config.window_size}")
+
+                # Configure proxy if specified
+                if self.config.proxy_server:
+                    proxy_url = self.config.proxy_server
+                    logger.info(f"Configuring Edge with proxy: {proxy_url}")
+                    options.add_argument(f"--proxy-server={proxy_url}")
+
                 self._driver = webdriver.Edge(options=options)
 
             else:
@@ -280,25 +344,80 @@ class TelloWebClient:
             raise ElementNotFoundError("Driver not initialized")
 
         try:
-            balance_elements = WebDriverWait(self._driver, 30).until(
-                EC.presence_of_all_elements_located(
-                    (By.CSS_SELECTOR, "div.progress_holder div.pull-left.font-size30")
-                )
+            # First try to get account balance from pack_card (new structure)
+            try:
+                # Look for the pack_card that contains "Remaining balance"
+                pack_cards = self._driver.find_elements(By.CSS_SELECTOR, ".pack_card")
+                account_balance_amount = None
+
+                for card in pack_cards:
+                    card_text = card.text
+                    if "Remaining balance" in card_text:
+                        logger.debug(f"Found balance card text: {card_text}")
+                        # Extract balance amount using regex - handle Unicode directional marks
+                        import re
+
+                        balance_match = re.search(
+                            r"[⁦]?\$(\d+(?:\.\d{2})?)[⁩]?", card_text
+                        )
+                        if balance_match:
+                            account_balance_amount = float(balance_match.group(1))
+                            logger.info(
+                                f"Successfully extracted account balance: ${account_balance_amount}"
+                            )
+                            break
+
+                if account_balance_amount is not None:
+                    # Now get usage data from balance-details elements
+                    balance_details = self._driver.find_elements(
+                        By.CSS_SELECTOR, ".balance-details"
+                    )
+
+                    if len(balance_details) >= 2:
+                        # First balance-details is data usage
+                        data_text = balance_details[0].text
+                        logger.debug(f"Data balance text: {data_text}")
+
+                        # Second balance-details is minutes usage
+                        minutes_text = balance_details[1].text
+                        logger.debug(f"Minutes balance text: {minutes_text}")
+
+                        # For texts, check if there's a third balance-details or assume unlimited
+                        if len(balance_details) >= 3:
+                            texts_text = balance_details[2].text
+                            logger.debug(f"Texts balance text: {texts_text}")
+                        else:
+                            # Most Tello plans have unlimited texts
+                            texts_text = "unlimited texts"
+                            logger.debug(
+                                "No texts balance found, assuming unlimited texts"
+                            )
+
+                        balance = AccountBalance(
+                            data=BalanceQuantity.from_tello(data_text),
+                            minutes=BalanceQuantity.from_tello(minutes_text),
+                            texts=BalanceQuantity.from_tello(texts_text),
+                        )
+
+                        logger.info(
+                            f"Current balance: {balance} (using new pack_card structure)"
+                        )
+                        return balance
+                    else:
+                        logger.debug(
+                            f"Found balance amount but insufficient balance-details elements: {len(balance_details)}"
+                        )
+
+            except Exception as e:
+                logger.debug(f"New structure parsing failed: {e}")
+
+            # If new structure failed, raise error immediately to avoid long waits
+            logger.error(
+                "New balance structure parsing failed, website structure may have changed"
             )
-
-            if len(balance_elements) < 3:
-                raise ElementNotFoundError(
-                    f"Expected 3 balance elements, found {len(balance_elements)}"
-                )
-
-            balance = AccountBalance(
-                data=BalanceQuantity.from_tello(balance_elements[0].text),
-                minutes=BalanceQuantity.from_tello(balance_elements[1].text),
-                texts=BalanceQuantity.from_tello(balance_elements[2].text),
+            raise ElementNotFoundError(
+                "Could not find balance elements with new website structure. Website may have been updated."
             )
-
-            logger.info(f"Current balance: {balance}")
-            return balance
 
         except Exception as e:
             raise ElementNotFoundError(f"Failed to get current balance: {e}")
