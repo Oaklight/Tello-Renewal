@@ -5,7 +5,7 @@ PACKAGE_NAME := tello-renewal
 DIST_DIR := dist
 DOCKER_IMAGE := oaklight/tello-renewal
 BASE_IMAGE := oaklight/alpine-python-gecko
-VERSION := $(shell python -c "import urllib.request, json; response = urllib.request.urlopen('https://pypi.org/pypi/$(PACKAGE_NAME)/json'); data = json.loads(response.read()); print(data['info']['version'])" 2>/dev/null || python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+VERSION := $(shell python -c "import urllib.request, json; response = urllib.request.urlopen('https://pypi.org/pypi/$(PACKAGE_NAME)/json'); data = json.loads(response.read()); print(data['info']['version'])" 2>/dev/null || python -c "try:\n    import tomllib\nexcept ImportError:\n    import tomli as tomllib\nwith open('pyproject.toml', 'rb') as f:\n    print(tomllib.load(f)['project']['version'])" 2>/dev/null || echo "0.1.2")
 
 # Optional variables
 V ?= $(VERSION)
@@ -44,6 +44,9 @@ push-docker-base:
 # Build Docker image
 build-docker:
 	@echo "Building Docker image $(DOCKER_IMAGE):$(V)..."
+	@if [ ! -d "$(DIST_DIR)" ] || [ -z "$$(ls -A $(DIST_DIR) 2>/dev/null)" ]; then \
+		echo "No local distribution found, will install from PyPI"; \
+	fi
 	@if [ -n "$(MIRROR)" ]; then \
 		echo "Using PyPI mirror: $(MIRROR)"; \
 		./scripts/build.sh $(V) --mirror $(MIRROR); \
