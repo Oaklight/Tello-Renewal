@@ -1,12 +1,16 @@
-"""Cache management for Tello renewal system.
+"""State management for Tello renewal system.
 
-This module provides functionality to manage the DUE_DATE cache file
-to prevent frequent renewal checks and avoid upstream bot detection.
+This module provides functionality to manage state files including
+due date tracking and renewal execution status to prevent frequent
+renewal checks and avoid upstream bot detection.
 """
 
+import json
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+
+import pytz
 
 from .logging import get_logger
 
@@ -23,16 +27,17 @@ class ExecutionStatus:
 
 
 class DueDateCache:
-    """Manages the DUE_DATE cache file for renewal scheduling."""
+    """Manages the due_date state file for renewal scheduling."""
 
-    def __init__(self, cache_file_path: str = "DUE_DATE"):
+    def __init__(self, state_folder_path: str = ".tello_state"):
         """Initialize the cache manager.
 
         Args:
-            cache_file_path: Path to the cache file
+            state_folder_path: Path to the state folder
         """
-        self.cache_file_path = Path(cache_file_path)
-        logger.debug(f"Initialized DueDateCache with path: {self.cache_file_path}")
+        self.state_folder = Path(state_folder_path)
+        self.due_date_file = self.state_folder / "due_date"
+        logger.debug(f"Initialized DueDateCache with folder: {self.state_folder}")
 
     def read_cached_date(self) -> date | None:
         """Read the cached renewal date from file.
@@ -43,16 +48,16 @@ class DueDateCache:
         Raises:
             ValueError: If the cached date format is invalid
         """
-        if not self.cache_file_path.exists():
-            logger.debug("Cache file does not exist")
+        if not self.due_date_file.exists():
+            logger.debug("Due date file does not exist")
             return None
 
         try:
-            with open(self.cache_file_path, encoding="utf-8") as f:
+            with open(self.due_date_file, encoding="utf-8") as f:
                 date_str = f.read().strip()
 
             if not date_str:
-                logger.warning("Cache file is empty")
+                logger.warning("Due date file is empty")
                 return None
 
             # Parse the date in ISO format (YYYY-MM-DD)
@@ -61,10 +66,10 @@ class DueDateCache:
             return cached_date
 
         except OSError as e:
-            logger.error(f"Failed to read cache file: {e}")
+            logger.error(f"Failed to read due date file: {e}")
             return None
         except ValueError as e:
-            logger.error(f"Invalid date format in cache file: {e}")
+            logger.error(f"Invalid date format in due date file: {e}")
             # Remove invalid cache file
             self._remove_cache_file()
             return None
@@ -79,18 +84,18 @@ class DueDateCache:
             True if successful, False otherwise
         """
         try:
-            # Create parent directories if they don't exist
-            self.cache_file_path.parent.mkdir(parents=True, exist_ok=True)
+            # Create state directory if it doesn't exist
+            self.state_folder.mkdir(parents=True, exist_ok=True)
 
             # Write the date in ISO format
-            with open(self.cache_file_path, "w", encoding="utf-8") as f:
+            with open(self.due_date_file, "w", encoding="utf-8") as f:
                 f.write(renewal_date.strftime("%Y-%m-%d"))
 
             logger.info(f"Cached renewal date: {renewal_date}")
             return True
 
         except OSError as e:
-            logger.error(f"Failed to write cache file: {e}")
+            logger.error(f"Failed to write due date file: {e}")
             return False
 
     def is_within_range(self, current_date: date, range_days: int) -> bool:
@@ -129,8 +134,8 @@ class DueDateCache:
         Returns:
             True if renewal should be skipped, False otherwise
         """
-        if not self.cache_file_path.exists():
-            logger.debug("No cache file exists, should not skip renewal")
+        if not self.due_date_file.exists():
+            logger.debug("No due date file exists, should not skip renewal")
             return False
 
         # If we're within range of the cached renewal date, we should NOT skip
@@ -153,32 +158,33 @@ class DueDateCache:
         return self._remove_cache_file()
 
     def _remove_cache_file(self) -> bool:
-        """Remove the cache file.
+        """Remove the due date file.
 
         Returns:
             True if successful or file doesn't exist, False otherwise
         """
         try:
-            if self.cache_file_path.exists():
-                self.cache_file_path.unlink()
-                logger.info("Cache file removed")
+            if self.due_date_file.exists():
+                self.due_date_file.unlink()
+                logger.info("Due date file removed")
             else:
-                logger.debug("Cache file does not exist, nothing to remove")
+                logger.debug("Due date file does not exist, nothing to remove")
             return True
 
         except OSError as e:
-            logger.error(f"Failed to remove cache file: {e}")
+            logger.error(f"Failed to remove due date file: {e}")
             return False
 
     def get_cache_info(self) -> dict[str, Any]:
-        """Get information about the cache file.
+        """Get information about the due date file.
 
         Returns:
             Dictionary containing cache information
         """
         info: dict[str, Any] = {
-            "cache_file_path": str(self.cache_file_path),
-            "exists": self.cache_file_path.exists(),
+            "state_folder_path": str(self.state_folder),
+            "due_date_file_path": str(self.due_date_file),
+            "exists": self.due_date_file.exists(),
             "cached_date": None,
             "file_size": None,
             "last_modified": None,
@@ -186,14 +192,226 @@ class DueDateCache:
 
         if info["exists"]:
             try:
-                stat = self.cache_file_path.stat()
+                stat = self.due_date_file.stat()
                 info["file_size"] = stat.st_size
                 info["last_modified"] = datetime.fromtimestamp(
                     stat.st_mtime
                 ).isoformat()
                 info["cached_date"] = self.read_cached_date()
             except OSError as e:
-                logger.error(f"Failed to get cache file info: {e}")
+                logger.error(f"Failed to get due date file info: {e}")
+
+        return info
+
+
+def get_chicago_time() -> datetime:
+    """Get current time in Chicago timezone.
+
+    Returns:
+        Current datetime in America/Chicago timezone
+    """
+    chicago_tz = pytz.timezone("America/Chicago")
+    return datetime.now(chicago_tz)
+
+
+class RunStateCache:
+    """Manages the run_state file for renewal execution tracking."""
+
+    def __init__(self, state_folder_path: str = ".tello_state"):
+        """Initialize the run state cache manager.
+
+        Args:
+            state_folder_path: Path to the state folder
+        """
+        self.state_folder = Path(state_folder_path)
+        self.run_state_file = self.state_folder / "run_state"
+        logger.debug(f"Initialized RunStateCache with folder: {self.state_folder}")
+
+    def read_run_state(self) -> dict[str, Any] | None:
+        """Read the last run state from file.
+
+        Returns:
+            Dictionary containing run state or None if file doesn't exist or is invalid
+        """
+        if not self.run_state_file.exists():
+            logger.debug("Run state file does not exist")
+            return None
+
+        try:
+            with open(self.run_state_file, encoding="utf-8") as f:
+                state_data = json.load(f)
+
+            # Validate required fields
+            required_fields = ["date", "success", "dry"]
+            if not all(field in state_data for field in required_fields):
+                logger.warning(
+                    f"Run state file missing required fields: {required_fields}"
+                )
+                return None
+
+            # Parse the date
+            try:
+                state_data["date"] = datetime.fromisoformat(state_data["date"])
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Invalid date format in run state file: {e}")
+                return None
+
+            logger.info(f"Read run state: {state_data}")
+            return state_data
+
+        except (OSError, json.JSONDecodeError) as e:
+            logger.error(f"Failed to read run state file: {e}")
+            # Remove invalid state file
+            self._remove_state_file()
+            return None
+
+    def write_run_state(
+        self, success: bool, dry: bool, timestamp: datetime | None = None
+    ) -> bool:
+        """Write the run state to file.
+
+        Args:
+            success: Whether the renewal was successful
+            dry: Whether this was a dry run
+            timestamp: The execution timestamp (defaults to current Chicago time)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if timestamp is None:
+            timestamp = get_chicago_time()
+
+        state_data = {"date": timestamp.isoformat(), "success": success, "dry": dry}
+
+        try:
+            # Create state directory if it doesn't exist
+            self.state_folder.mkdir(parents=True, exist_ok=True)
+
+            # Write state data as JSON
+            with open(self.run_state_file, "w", encoding="utf-8") as f:
+                json.dump(state_data, f, indent=2)
+
+            logger.info(f"Wrote run state: {state_data}")
+            return True
+
+        except OSError as e:
+            logger.error(f"Failed to write run state file: {e}")
+            return False
+
+    def should_skip_renewal(self, due_date: date, days_before: int) -> bool:
+        """Determine if renewal should be skipped based on run state.
+
+        Args:
+            due_date: The renewal due date
+            days_before: Days before renewal to start attempting
+
+        Returns:
+            True if renewal should be skipped, False otherwise
+        """
+        chicago_time = get_chicago_time()
+        current_date = chicago_time.date()
+
+        # Check if we're in the renewal window
+        days_until_renewal = (due_date - current_date).days
+        in_renewal_window = 0 <= days_until_renewal <= days_before
+
+        if not in_renewal_window:
+            logger.debug(
+                f"Not in renewal window: {days_until_renewal} days until renewal"
+            )
+            return False  # Outside window, don't skip
+
+        logger.info(f"In renewal window: {days_until_renewal} days until renewal")
+
+        # Check run state
+        state_info = self.read_run_state()
+        if state_info is None:
+            logger.info("No run state found, should attempt renewal")
+            return False
+
+        # Check if the state is from today (Chicago time)
+        state_date = state_info["date"].date()
+        if state_date != current_date:
+            logger.info(
+                f"Run state is from {state_date}, not today ({current_date}), should attempt renewal"
+            )
+            return False
+
+        # If we had a successful renewal today, skip
+        if state_info["success"] and not state_info["dry"]:
+            logger.info("Renewal was successful today (not dry run), skipping")
+            return True
+
+        # If it was a dry run success, we can retry with real run
+        if state_info["success"] and state_info["dry"]:
+            logger.info(
+                "Previous attempt was successful dry run, should attempt real renewal"
+            )
+            return False
+
+        # If it failed, we can retry
+        if not state_info["success"]:
+            logger.info("Previous attempt failed, should retry")
+            return False
+
+        # Default to not skip
+        logger.info("Default behavior: should attempt renewal")
+        return False
+
+    def clear_state(self) -> bool:
+        """Remove the run state file.
+
+        Returns:
+            True if successful or file doesn't exist, False otherwise
+        """
+        return self._remove_state_file()
+
+    def _remove_state_file(self) -> bool:
+        """Remove the run state file.
+
+        Returns:
+            True if successful or file doesn't exist, False otherwise
+        """
+        try:
+            if self.run_state_file.exists():
+                self.run_state_file.unlink()
+                logger.info("Run state file removed")
+            else:
+                logger.debug("Run state file does not exist, nothing to remove")
+            return True
+
+        except OSError as e:
+            logger.error(f"Failed to remove run state file: {e}")
+            return False
+
+    def get_state_info(self) -> dict[str, Any]:
+        """Get information about the run state file.
+
+        Returns:
+            Dictionary containing state file information
+        """
+        info: dict[str, Any] = {
+            "state_folder_path": str(self.state_folder),
+            "run_state_file_path": str(self.run_state_file),
+            "exists": self.run_state_file.exists(),
+            "last_run": None,
+            "file_size": None,
+            "last_modified": None,
+        }
+
+        if info["exists"]:
+            try:
+                stat = self.run_state_file.stat()
+                info["file_size"] = stat.st_size
+                info["last_modified"] = datetime.fromtimestamp(
+                    stat.st_mtime
+                ).isoformat()
+
+                state_info = self.read_run_state()
+                if state_info:
+                    info["last_run"] = state_info
+            except OSError as e:
+                logger.error(f"Failed to get run state file info: {e}")
 
         return info
 

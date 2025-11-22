@@ -8,7 +8,12 @@ import time
 from datetime import date, datetime
 from typing import Any
 
-from ..utils.cache import DueDateCache, ExecutionStatus, ExecutionStatusCache
+from ..utils.cache import (
+    DueDateCache,
+    ExecutionStatus,
+    ExecutionStatusCache,
+    RunStateCache,
+)
 from ..utils.config import Config
 from ..utils.exceptions import TelloRenewalError
 from ..utils.logging import get_logger, log_duration
@@ -32,11 +37,11 @@ class RenewalEngine:
         self.config = config
         self.dry_run = dry_run or config.renewal.dry_run
 
-        # Initialize cache managers
-        self.cache = DueDateCache(config.renewal.cache_file_path)
-        self.exec_status_cache = ExecutionStatusCache(
-            config.renewal.exec_status_file_path
-        )
+        # Initialize state managers
+        self.cache = DueDateCache(config.renewal.state_folder_path)
+        self.run_state_cache = RunStateCache(config.renewal.state_folder_path)
+        # Keep old execution status cache for backward compatibility
+        self.exec_status_cache = ExecutionStatusCache("EXEC_STATUS")
 
         # Services will be initialized when web client is available
         self._account_service: AccountService | None = None
@@ -139,11 +144,27 @@ class RenewalEngine:
 
         # Check cache first unless force is True
         if not force:
+            # First check due date cache
             if self.cache.should_skip_renewal(
                 current_date, self.config.renewal.days_before_renewal
             ):
                 cached_date = self.cache.read_cached_date()
                 message = f"Skipping renewal check - within {self.config.renewal.days_before_renewal} days of cached date {cached_date}"
+                logger.info(message)
+                duration = time.time() - start_time
+                return RenewalResult(
+                    status=RenewalStatus.SKIPPED,
+                    timestamp=timestamp,
+                    message=message,
+                    duration_seconds=duration,
+                )
+
+            # Then check run state cache for today's execution
+            cached_date = self.cache.read_cached_date()
+            if cached_date and self.run_state_cache.should_skip_renewal(
+                cached_date, self.config.renewal.days_before_renewal
+            ):
+                message = "Skipping renewal - already successfully completed today"
                 logger.info(message)
                 duration = time.time() - start_time
                 return RenewalResult(
@@ -167,13 +188,16 @@ class RenewalEngine:
                 # Get renewal date and check if renewal is needed
                 renewal_date = self.account_service.get_renewal_date()
 
-                # Update cache with the actual renewal date (unless dry run)
-                if not self.dry_run:
+                # Always update cache with the actual renewal date
+                # This helps keep the cache fresh for future runs
+                cached_date = self.cache.read_cached_date()
+                if cached_date != renewal_date:
                     self.cache.write_cached_date(renewal_date)
-                else:
                     logger.info(
-                        f"Dry run mode - not updating cache with renewal date: {renewal_date}"
+                        f"Updated due_date cache with renewal date: {renewal_date}"
                     )
+                else:
+                    logger.debug(f"Due date cache already up to date: {renewal_date}")
 
                 if not self.account_service.check_renewal_needed(
                     renewal_date, self.config.renewal.days_before_renewal
@@ -219,7 +243,12 @@ class RenewalEngine:
 
                     logger.info(message)
 
-                    # Record success status (only if not dry run)
+                    # Record success status in new run state cache
+                    self.run_state_cache.write_run_state(
+                        success=True, dry=self.dry_run, timestamp=timestamp
+                    )
+
+                    # Also record in old execution status cache for backward compatibility
                     if not self.dry_run:
                         self.exec_status_cache.write_execution_status(
                             ExecutionStatus.SUCCESS, timestamp
@@ -240,7 +269,12 @@ class RenewalEngine:
             error_msg = str(e)
             logger.error(f"Renewal failed: {error_msg}")
 
-            # Record failure status
+            # Record failure status in new run state cache
+            self.run_state_cache.write_run_state(
+                success=False, dry=self.dry_run, timestamp=timestamp
+            )
+
+            # Also record in old execution status cache for backward compatibility
             self.exec_status_cache.write_execution_status(
                 ExecutionStatus.FAILED, timestamp
             )

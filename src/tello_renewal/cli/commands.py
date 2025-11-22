@@ -120,13 +120,13 @@ def cmd_status(args: Args) -> None:
         engine = RenewalEngine(config, dry_run=True)
         summary = engine.get_account_summary()
 
-        # Update DUE_DATE cache since we retrieved the renewal date
+        # Update due_date cache since we retrieved the renewal date
         # This helps keep the cache fresh even when just checking status
         from ..utils.cache import DueDateCache
 
-        cache = DueDateCache(config.renewal.cache_file_path)
+        cache = DueDateCache(config.renewal.state_folder_path)
         cache.write_cached_date(summary.renewal_date)
-        logger.info(f"Updated DUE_DATE cache with renewal date: {summary.renewal_date}")
+        logger.info(f"Updated due_date cache with renewal date: {summary.renewal_date}")
 
         print(f"Account: {summary.email}")
         print(f"Renewal date: {summary.renewal_date}")
