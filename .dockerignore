@@ -45,7 +45,7 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-dist/
+<!-- dist/ -->
 build/
 *.egg-info/
 logs/
