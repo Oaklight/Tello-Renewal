@@ -133,7 +133,16 @@ class DueDateCache:
             logger.debug("No cache file exists, should not skip renewal")
             return False
 
-        return self.is_within_range(current_date, range_days)
+        # If we're within range of the cached renewal date, we should NOT skip
+        # (i.e., we should proceed with renewal check)
+        # If we're outside the range, we should skip (too far from renewal date)
+        within_range = self.is_within_range(current_date, range_days)
+        should_skip = not within_range
+
+        logger.debug(
+            f"should_skip_renewal: within_range={within_range}, should_skip={should_skip}"
+        )
+        return should_skip
 
     def clear_cache(self) -> bool:
         """Remove the cache file.
