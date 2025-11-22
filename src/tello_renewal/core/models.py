@@ -48,7 +48,8 @@ class BalanceQuantity:
         """Parse a balance quantity from Tello's string format.
 
         Args:
-            tello_str: String from Tello website (e.g., "5.0 GB", "unlimited minutes")
+            tello_str: String from Tello website (e.g., "5.0 GB", "unlimited minutes",
+                      "8.94 GB\n8.94 GB remaining / 2 GB")
 
         Returns:
             BalanceQuantity instance
@@ -56,7 +57,10 @@ class BalanceQuantity:
         Raises:
             ValueError: If the format is not recognized
         """
-        parts = tello_str.strip().split(" ", 1)
+        # Handle multi-line text by taking the first line
+        first_line = tello_str.strip().split("\n")[0].strip()
+
+        parts = first_line.split(" ", 1)
         if len(parts) != 2:
             raise ValueError(f"Invalid balance format: {tello_str}")
 
@@ -70,7 +74,9 @@ class BalanceQuantity:
             "text": "texts",
             "texts": "texts",
             "gb": "GB",
+            "GB": "GB",
             "mb": "MB",
+            "MB": "MB",
         }
         normalized_unit = unit_mapping.get(unit.lower(), unit.lower())
 
