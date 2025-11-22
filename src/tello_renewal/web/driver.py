@@ -4,7 +4,6 @@ This module provides centralized browser driver creation and configuration,
 supporting multiple browser types with proxy and headless options.
 """
 
-from typing import Optional
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
@@ -65,7 +64,7 @@ class BrowserDriverManager:
 
         except Exception as e:
             logger.error(f"Failed to initialize web driver: {e}")
-            raise WebDriverError(f"Failed to initialize browser: {e}")
+            raise WebDriverError("Failed to initialize browser") from e
 
     def _create_firefox_driver(self) -> WebDriver:
         """Create Firefox driver with configuration."""

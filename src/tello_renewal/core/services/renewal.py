@@ -5,10 +5,10 @@ renewal execution and form handling.
 """
 
 from datetime import date
+from typing import Any
 
 from ...utils.logging import get_logger
 from ...web.client import TelloWebClient
-from ..models import AccountBalance, RenewalResult, RenewalStatus
 
 logger = get_logger(__name__)
 
@@ -138,6 +138,9 @@ class RenewalService:
             Exception: If any step fails
         """
         try:
+            if dry_run:
+                logger.info("DRY RUN: Complete renewal process skipped")
+                return True
             return self.web_client.complete_renewal_process(card_expiration)
 
         except Exception as e:
@@ -168,7 +171,7 @@ class RenewalService:
             logger.error(f"Failed to validate renewal prerequisites: {e}")
             return False
 
-    def get_renewal_status(self) -> dict[str, any]:
+    def get_renewal_status(self) -> dict[str, Any]:
         """Get current renewal status information.
 
         Returns:

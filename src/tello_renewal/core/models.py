@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from ..utils.logging import get_logger
 
@@ -33,7 +33,7 @@ class BalanceQuantity:
     quantities, which can be unlimited or have specific numeric values.
     """
 
-    def __init__(self, value: Optional[Union[int, float]], unit: str) -> None:
+    def __init__(self, value: int | float | None, unit: str) -> None:
         """Initialize a balance quantity.
 
         Args:
@@ -92,7 +92,7 @@ class BalanceQuantity:
                 # Default to float for unknown units
                 return cls(float(value_str), normalized_unit)
         except ValueError as e:
-            raise ValueError(f"Cannot parse value '{value_str}' as number: {e}")
+            raise ValueError(f"Cannot parse value '{value_str}' as number") from e
 
     def __add__(self, other: BalanceQuantity) -> BalanceQuantity:
         """Add two balance quantities.
@@ -127,7 +127,7 @@ class BalanceQuantity:
         return f"BalanceQuantity(value={self._value}, unit='{self._unit}')"
 
     @property
-    def value(self) -> Optional[Union[int, float]]:
+    def value(self) -> int | float | None:
         """Get the numeric value."""
         return self._value
 
@@ -169,7 +169,7 @@ class AccountBalance:
         """String representation of the account balance."""
         return f"{self.data}, {self.minutes}, {self.texts}"
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         """Convert to dictionary representation."""
         return {
             "data": str(self.data),
@@ -185,18 +185,18 @@ class RenewalResult:
     status: RenewalStatus
     timestamp: datetime
     message: str
-    new_balance: Optional[AccountBalance] = None
-    error: Optional[str] = None
-    duration_seconds: Optional[float] = None
+    new_balance: AccountBalance | None = None
+    error: str | None = None
+    duration_seconds: float | None = None
 
     @property
     def success(self) -> bool:
         """Check if the renewal was successful."""
         return self.status == RenewalStatus.SUCCESS
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "status": self.status.value,
             "timestamp": self.timestamp.isoformat(),
             "message": self.message,
@@ -233,7 +233,7 @@ class AccountSummary:
         """Check if renewal is due (within 1 day)."""
         return self.days_until_renewal <= 1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "email": self.email,

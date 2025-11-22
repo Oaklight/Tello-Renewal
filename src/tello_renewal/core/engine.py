@@ -5,7 +5,8 @@ all services using the Page Object Model and service layer.
 """
 
 import time
-from datetime import datetime
+from datetime import date, datetime
+from typing import Any
 
 from ..utils.config import Config
 from ..utils.exceptions import TelloRenewalError
@@ -112,7 +113,7 @@ class RenewalEngine:
 
         except Exception as e:
             logger.error(f"Failed to get account summary: {e}")
-            raise TelloRenewalError(f"Failed to get account summary: {e}")
+            raise TelloRenewalError("Failed to get account summary") from e
 
     def execute_renewal(self) -> RenewalResult:
         """Execute the complete renewal process.
@@ -206,7 +207,7 @@ class RenewalEngine:
                 duration_seconds=duration,
             )
 
-    def check_renewal_needed(self, renewal_date: datetime.date) -> bool:
+    def check_renewal_needed(self, renewal_date: date) -> bool:
         """Check if renewal is needed based on date.
 
         Args:
@@ -250,7 +251,7 @@ class RenewalEngine:
             logger.error(f"Configuration validation failed: {e}")
             raise
 
-    def get_system_status(self) -> dict[str, any]:
+    def get_system_status(self) -> dict[str, Any]:
         """Get current system status information.
 
         Returns:
