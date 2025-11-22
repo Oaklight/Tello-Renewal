@@ -66,10 +66,13 @@ class RenewalEngine:
             # Convert to original exception type for backward compatibility
             raise TelloRenewalError("Failed to get account summary") from e
 
-    def execute_renewal(self) -> RenewalResult:
+    def execute_renewal(self, force: bool = False) -> RenewalResult:
         """Execute the complete renewal process.
+
+        Args:
+            force: If True, ignore cached due date and force renewal check
 
         Returns:
             Result of the renewal operation
         """
-        return self._engine.execute_renewal()
+        return self._engine.execute_renewal(force=force)
