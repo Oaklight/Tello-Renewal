@@ -179,6 +179,9 @@ class RenewalConfig(BaseModel):
     cache_file_path: str = Field(
         default="DUE_DATE", description="Path to the due date cache file"
     )
+    exec_status_file_path: str = Field(
+        default="EXEC_STATUS", description="Path to the execution status cache file"
+    )
 
     @field_validator("days_before_renewal")
     @classmethod
@@ -195,7 +198,6 @@ class RenewalConfig(BaseModel):
         if value < 0 or value > 10:
             raise ValueError("Max retries must be between 0 and 10")
         return value
-
 
 
 class SmtpConfig(BaseModel):
@@ -392,6 +394,7 @@ max_retries = 3
 retry_delay = 300  # seconds
 dry_run = false
 cache_file_path = "DUE_DATE"  # path to the due date cache file
+exec_status_file_path = "EXEC_STATUS"  # path to the execution status cache file
 
 [smtp]
 server = "smtp.gmail.com"
