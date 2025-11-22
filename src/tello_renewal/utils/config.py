@@ -176,11 +176,9 @@ class RenewalConfig(BaseModel):
         default=300, description="Delay between retries in seconds"
     )
     dry_run: bool = Field(default=False, description="Global dry run setting")
-    cache_file_path: str = Field(
-        default="DUE_DATE", description="Path to the due date cache file"
-    )
-    exec_status_file_path: str = Field(
-        default="EXEC_STATUS", description="Path to the execution status cache file"
+    state_folder_path: str = Field(
+        default=".tello_state",
+        description="Directory path for state files (due_date, run_state)",
     )
 
     @field_validator("days_before_renewal")
@@ -393,8 +391,7 @@ days_before_renewal = 1  # days before renewal date to execute and cache range
 max_retries = 3
 retry_delay = 300  # seconds
 dry_run = false
-cache_file_path = "DUE_DATE"  # path to the due date cache file
-exec_status_file_path = "EXEC_STATUS"  # path to the execution status cache file
+state_folder_path = ".tello_state"  # directory for state files (due_date, run_state)
 
 [smtp]
 server = "smtp.gmail.com"
