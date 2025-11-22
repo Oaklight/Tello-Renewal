@@ -110,6 +110,12 @@ class BrowserConfig(BaseModel):
         default=10, description="Implicit wait timeout in seconds"
     )
     window_size: str = Field(default="1920x1080", description="Browser window size")
+    proxy_server: Optional[str] = Field(
+        default=None, description="Proxy server URL (e.g., http://10.126.126.2:7890)"
+    )
+    proxy_type: str = Field(
+        default="http", description="Proxy type (http, https, socks5)"
+    )
 
     @field_validator("browser_type")
     @classmethod
@@ -133,6 +139,29 @@ class BrowserConfig(BaseModel):
             raise ValueError(
                 "Window size must be in format 'WIDTHxHEIGHT' (e.g., '1920x1080')"
             )
+
+    @field_validator("proxy_type")
+    @classmethod
+    def validate_proxy_type(cls, value: str) -> str:
+        """Validate proxy type."""
+        allowed_types = {"http", "https", "socks5"}
+        if value.lower() not in allowed_types:
+            raise ValueError(f"Proxy type must be one of: {allowed_types}")
+        return value.lower()
+
+    @field_validator("proxy_server")
+    @classmethod
+    def validate_proxy_server(cls, value: Optional[str]) -> Optional[str]:
+        """Validate proxy server URL format."""
+        if value is None:
+            return None
+
+        # Basic URL validation
+        if not value.startswith(("http://", "https://", "socks5://")):
+            # If no protocol specified, assume http
+            value = f"http://{value}"
+
+        return value.strip()
 
 
 class RenewalConfig(BaseModel):
@@ -349,6 +378,8 @@ browser_type = "firefox"  # firefox, chrome, edge
 page_load_timeout = 30
 implicit_wait = 10
 window_size = "1920x1080"
+# proxy_server = "http://10.126.126.2:7890"  # Uncomment and set your proxy
+# proxy_type = "http"  # http, https, socks5
 
 [renewal]
 auto_renew = true
