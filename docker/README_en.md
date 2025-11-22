@@ -51,10 +51,10 @@ The base image includes this Python package:
 
 ```bash
 # Build the base image
-make docker-build-base
+make build-docker-base
 
 # Push to DockerHub
-make docker-push-base
+make push-docker-base
 ```
 
 #### Using in Other Projects
@@ -103,13 +103,22 @@ The current geckodriver version is `0.36.0`. To update:
 
 ```bash
 # Build base image first
-make docker-build-base
+make build-docker-base
 
-# Build application image
-make docker-build
+# Build application image (auto-detects version)
+make build-docker
 
-# Or use build script
+# Or use build script directly
 ./scripts/build.sh
+
+# Build with specific version
+make build-docker V=1.0.0
+
+# Build with PyPI mirror
+make build-docker MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple
+
+# Build with both version and mirror
+make build-docker V=1.0.0 MIRROR=https://mirrors.cernet.edu.cn/pypi/web/simple
 ```
 
 ### 2. Prepare Configuration
@@ -229,6 +238,22 @@ project/
 | `TZ`          | `America/Chicago`         | Timezone setting        |
 | `CONFIG_FILE` | `/app/config/config.toml` | Configuration file path |
 
+### Makefile Variables
+
+| Variable | Default                                   | Description                                     |
+| -------- | ----------------------------------------- | ----------------------------------------------- |
+| `V`      | Auto-detected from PyPI or pyproject.toml | Docker image version tag                        |
+| `MIRROR` | (empty)                                   | PyPI mirror URL for faster package installation |
+
+#### Version Detection
+
+The build system automatically detects the version in this order:
+
+1. **Local wheel file** - If `dist/*.whl` exists, uses the version from the wheel filename
+2. **Provided version** - If `V=x.x.x` is specified, uses that version
+3. **PyPI latest** - Fetches the latest version from PyPI
+4. **Local fallback** - Uses version from `pyproject.toml` if PyPI is unavailable
+
 ### Configuration File Example
 
 ```toml
@@ -275,6 +300,7 @@ recipients = ["admin@example.com"]
    ```
 
 3. **Permission issues**
+
    ```bash
    # Check directory permissions
    chmod 755 config logs
@@ -320,11 +346,12 @@ docker run -it --rm \
    ```
 
 4. **Regular updates**
+
    ```bash
    # Update images
    docker pull python:3.11-alpine
-   make docker-build-base
-   make docker-build
+   make build-docker-base
+   make build-docker
    ```
 
 ## 📊 Monitoring and Logs
@@ -359,13 +386,30 @@ docker inspect tello-renewal
 ### Update Application
 
 ```bash
-# Rebuild images
-make docker-build-base
-make docker-build
+# Pull latest base image and rebuild
+docker pull python:3.11-alpine
+make build-docker-base
+make build-docker
 
-# Restart container
-docker-compose down
-docker-compose up -d tello-renewal
+# Or update to specific version
+make build-docker V=1.2.0
+
+# Update run script
+curl -o run.sh https://raw.githubusercontent.com/Oaklight/Tello-Renewal/refs/heads/master/scripts/run.sh
+chmod +x run.sh
+```
+
+### Package Management
+
+```bash
+# Build Python package
+make build-package
+
+# Push package to PyPI
+make push-package
+
+# Clean package build files
+make clean-package
 ```
 
 ### Backup Configuration
@@ -385,7 +429,7 @@ docker image prune
 docker system prune -a
 
 # Use Makefile cleanup
-make docker-clean
+make clean-docker
 ```
 
 ## 📞 Support
