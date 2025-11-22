@@ -5,6 +5,7 @@ and submission using the Page Object Model pattern.
 """
 
 from datetime import date
+from typing import Any
 
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support.ui import Select
@@ -58,7 +59,7 @@ class RenewalPage(BasePage):
             )
 
         except Exception as e:
-            raise RenewalError(f"Failed to fill card expiration: {e}")
+            raise RenewalError("Failed to fill card expiration") from e
 
     def check_notification_checkbox(self) -> None:
         """Check the recurring charge notification checkbox.
@@ -78,7 +79,7 @@ class RenewalPage(BasePage):
                 logger.info("Notification checkbox already checked")
 
         except Exception as e:
-            raise RenewalError(f"Failed to check notification checkbox: {e}")
+            raise RenewalError("Failed to check notification checkbox") from e
 
     def submit_renewal(self, dry_run: bool = False) -> bool:
         """Submit the renewal order.
@@ -119,7 +120,7 @@ class RenewalPage(BasePage):
                 return True
 
         except Exception as e:
-            raise RenewalError(f"Failed to submit renewal: {e}")
+            raise RenewalError("Failed to submit renewal") from e
 
     def complete_renewal_process(
         self, expiration_date: date, dry_run: bool = False
@@ -149,7 +150,7 @@ class RenewalPage(BasePage):
         except RenewalError:
             raise
         except Exception as e:
-            raise RenewalError(f"Renewal process failed: {e}")
+            raise RenewalError("Renewal process failed") from e
 
     def is_on_renewal_page(self) -> bool:
         """Check if currently on renewal page.
@@ -159,7 +160,7 @@ class RenewalPage(BasePage):
         """
         return self.is_element_present(TelloLocators.FINALIZE_ORDER_BUTTON, timeout=5)
 
-    def get_renewal_summary(self) -> dict:
+    def get_renewal_summary(self) -> dict[str, Any]:
         """Get renewal summary information if available.
 
         Returns:

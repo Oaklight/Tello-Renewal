@@ -6,7 +6,6 @@ and renewal date retrieval using the Page Object Model pattern.
 
 import re
 from datetime import date, datetime
-from typing import List, Optional
 
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
@@ -53,10 +52,10 @@ class DashboardPage(BasePage):
             # date_text is guaranteed to be defined here since we're in the try block
             date_text_safe = locals().get("date_text", "unknown")
             raise ElementNotFoundError(
-                f"Failed to parse renewal date '{date_text_safe}': {e}"
-            )
+                f"Failed to parse renewal date '{date_text_safe}'"
+            ) from e
         except Exception as e:
-            raise ElementNotFoundError(f"Failed to get renewal date: {e}")
+            raise ElementNotFoundError("Failed to get renewal date") from e
 
     def get_current_balance(self) -> AccountBalance:
         """Get current account balance.
@@ -102,7 +101,7 @@ class DashboardPage(BasePage):
                 raise ElementNotFoundError("Could not extract account balance amount")
 
         except Exception as e:
-            raise ElementNotFoundError(f"Failed to get current balance: {e}")
+            raise ElementNotFoundError("Failed to get current balance") from e
 
     def get_plan_balance(self) -> AccountBalance:
         """Get plan balance information.
@@ -136,7 +135,7 @@ class DashboardPage(BasePage):
             return balance
 
         except Exception as e:
-            raise ElementNotFoundError(f"Failed to get plan balance: {e}")
+            raise ElementNotFoundError("Failed to get plan balance") from e
 
     def click_renew_button(self) -> None:
         """Click the plan renewal button.
@@ -156,9 +155,9 @@ class DashboardPage(BasePage):
                 raise ElementNotFoundError("Failed to click renew button")
 
         except Exception as e:
-            raise ElementNotFoundError(f"Failed to click renew button: {e}")
+            raise ElementNotFoundError("Failed to click renew button") from e
 
-    def _extract_account_balance(self) -> Optional[float]:
+    def _extract_account_balance(self) -> float | None:
         """Extract account balance amount from pack cards.
 
         Returns:
@@ -190,9 +189,9 @@ class DashboardPage(BasePage):
             raise ElementNotFoundError("Could not find balance amount in pack cards")
 
         except Exception as e:
-            raise ElementNotFoundError(f"Failed to extract account balance: {e}")
+            raise ElementNotFoundError("Failed to extract account balance") from e
 
-    def _get_balance_details(self) -> List[WebElement]:
+    def _get_balance_details(self) -> list[WebElement]:
         """Get balance details elements.
 
         Returns:
@@ -209,7 +208,7 @@ class DashboardPage(BasePage):
             return balance_details
 
         except Exception as e:
-            raise ElementNotFoundError(f"Failed to get balance details: {e}")
+            raise ElementNotFoundError("Failed to get balance details") from e
 
     def is_on_dashboard(self) -> bool:
         """Check if currently on dashboard page.

@@ -8,7 +8,7 @@ import sys
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -110,7 +110,7 @@ class BrowserConfig(BaseModel):
         default=10, description="Implicit wait timeout in seconds"
     )
     window_size: str = Field(default="1920x1080", description="Browser window size")
-    proxy_server: Optional[str] = Field(
+    proxy_server: str | None = Field(
         default=None, description="Proxy server URL (e.g., http://10.126.126.2:7890)"
     )
     proxy_type: str = Field(
@@ -138,7 +138,7 @@ class BrowserConfig(BaseModel):
         except (ValueError, AttributeError):
             raise ValueError(
                 "Window size must be in format 'WIDTHxHEIGHT' (e.g., '1920x1080')"
-            )
+            ) from None
 
     @field_validator("proxy_type")
     @classmethod
@@ -151,7 +151,7 @@ class BrowserConfig(BaseModel):
 
     @field_validator("proxy_server")
     @classmethod
-    def validate_proxy_server(cls, value: Optional[str]) -> Optional[str]:
+    def validate_proxy_server(cls, value: str | None) -> str | None:
         """Validate proxy server URL format."""
         if value is None:
             return None
@@ -236,7 +236,7 @@ class LoggingConfig(BaseModel):
     format: str = Field(
         default="detailed", description="Log format (simple, detailed, json)"
     )
-    file: Optional[str] = Field(default=None, description="Log file path")
+    file: str | None = Field(default=None, description="Log file path")
     max_size: str = Field(default="10MB", description="Maximum log file size")
     backup_count: int = Field(default=5, description="Number of backup log files")
     console_output: bool = Field(default=True, description="Enable console output")
@@ -297,11 +297,11 @@ def load_toml_config(config_path: Path) -> dict[str, Any]:
         with open(config_path, "rb") as f:
             return tomllib.load(f)
     except Exception as e:
-        raise ValueError(f"Invalid TOML configuration file: {e}")
+        raise ValueError("Invalid TOML configuration file") from e
 
 
 @lru_cache(maxsize=1)
-def get_settings(config_path: Optional[str] = None) -> Config:
+def get_settings(config_path: str | None = None) -> Config:
     """Load and cache configuration settings.
 
     Args:
@@ -353,7 +353,7 @@ def get_settings(config_path: Optional[str] = None) -> Config:
     try:
         return Config(**config_data)
     except Exception as e:
-        raise ValueError(f"Invalid configuration: {e}")
+        raise ValueError("Invalid configuration") from e
 
 
 def create_example_config(output_path: Path) -> None:

@@ -5,7 +5,7 @@ providing fallback strategies and clear documentation for each element.
 """
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import Any
 
 from selenium.webdriver.common.by import By
 
@@ -17,7 +17,7 @@ class Locator:
     by: str
     value: str
     description: str
-    fallbacks: List["Locator"] = field(default_factory=list)
+    fallbacks: list["Locator"] = field(default_factory=list)
 
     def __post_init__(self):
         """Validate locator after initialization."""
@@ -109,13 +109,13 @@ class TelloLocators:
     )
 
     @classmethod
-    def get_all_locators(cls) -> List[Locator]:
+    def get_all_locators(cls) -> list[Locator]:
         """Get all defined locators.
 
         Returns:
             List of all Locator instances defined in this class
         """
-        locators = []
+        locators: list[Any] = []
         for attr_name in dir(cls):
             if not attr_name.startswith("_") and attr_name != "get_all_locators":
                 attr_value = getattr(cls, attr_name)

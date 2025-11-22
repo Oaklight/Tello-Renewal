@@ -6,20 +6,14 @@ using the Page Object Model pattern with centralized driver management.
 
 from datetime import date
 from types import TracebackType
-from typing import Optional
 
 from selenium.webdriver.remote.webdriver import WebDriver
+from typing_extensions import Self
 
 from ..core.models import AccountBalance
 from ..utils.config import BrowserConfig
 from ..utils.exceptions import WebDriverError
 from ..utils.logging import get_logger
-
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
-
 from .driver import BrowserDriverManager
 from .pages import DashboardPage, LoginPage, RenewalPage
 
@@ -38,13 +32,13 @@ class TelloWebClient:
         """
         self.config = browser_config
         self.dry_run = dry_run
-        self._driver: Optional[WebDriver] = None
+        self._driver: WebDriver | None = None
         self._driver_manager = BrowserDriverManager(browser_config)
 
         # Page objects - initialized when driver is available
-        self._login_page: Optional[LoginPage] = None
-        self._dashboard_page: Optional[DashboardPage] = None
-        self._renewal_page: Optional[RenewalPage] = None
+        self._login_page: LoginPage | None = None
+        self._dashboard_page: DashboardPage | None = None
+        self._renewal_page: RenewalPage | None = None
 
     def __enter__(self) -> Self:
         """Context manager entry - initialize browser and pages."""
@@ -54,9 +48,9 @@ class TelloWebClient:
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         """Context manager exit - cleanup browser."""
         self._cleanup_driver()
@@ -68,7 +62,7 @@ class TelloWebClient:
             logger.info("Web driver initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize web driver: {e}")
-            raise WebDriverError(f"Failed to initialize browser: {e}")
+            raise WebDriverError("Failed to initialize browser") from e
 
     def _initialize_pages(self) -> None:
         """Initialize page objects."""
