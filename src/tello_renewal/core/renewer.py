@@ -9,22 +9,10 @@ from datetime import date
 from ..utils.config import Config
 
 # Re-export exceptions for backward compatibility
-from ..utils.exceptions import (
-    ElementNotFoundError,
-)
-from ..utils.exceptions import (
-    LoginError as LoginFailedError,
-)
-from ..utils.exceptions import (
-    RenewalError as RenewalPageError,
-)
-from ..utils.exceptions import (
-    TelloRenewalError as TelloWebError,
-)
+from ..utils.exceptions import TelloRenewalError
 from ..utils.logging import get_logger
 
 # Import the new web client for backward compatibility
-from ..web.client import TelloWebClient
 from .engine import RenewalEngine as NewRenewalEngine
 from .models import AccountSummary, RenewalResult
 
@@ -70,13 +58,13 @@ class RenewalEngine:
             Complete account summary
 
         Raises:
-            TelloWebError: If web automation fails
+            TelloRenewalError: If web automation fails
         """
         try:
             return self._engine.get_account_summary()
         except Exception as e:
             # Convert to original exception type for backward compatibility
-            raise TelloWebError(f"Failed to get account summary: {e}")
+            raise TelloRenewalError("Failed to get account summary") from e
 
     def execute_renewal(self) -> RenewalResult:
         """Execute the complete renewal process.

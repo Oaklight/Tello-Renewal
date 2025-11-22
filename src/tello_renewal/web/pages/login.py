@@ -42,7 +42,7 @@ class LoginPage(BasePage):
             self.navigate_to(login_url)
             logger.info(f"Opened login page: {login_url}")
         except Exception as e:
-            raise LoginError(f"Failed to open login page: {e}")
+            raise LoginError("Failed to open login page") from e
 
     def enter_credentials(self, email: str, password: str) -> None:
         """Enter login credentials.
@@ -70,7 +70,7 @@ class LoginPage(BasePage):
             logger.debug("Password entered successfully")
 
         except Exception as e:
-            raise LoginError(f"Failed to enter credentials: {e}")
+            raise LoginError(f"Failed to enter credentials") from e
 
     def submit_login(self) -> None:
         """Submit the login form.
@@ -85,7 +85,7 @@ class LoginPage(BasePage):
             logger.debug("Login form submitted")
 
         except Exception as e:
-            raise LoginError(f"Failed to submit login form: {e}")
+            raise LoginError("Failed to submit login form") from e
 
     def wait_for_login_success(self, timeout: int = 15) -> bool:
         """Wait for login to complete successfully.
@@ -107,8 +107,8 @@ class LoginPage(BasePage):
 
         except Exception as e:
             raise LoginError(
-                f"Login failed - could not find account page elements: {e}"
-            )
+                "Login failed - could not find account page elements"
+            ) from e
 
     def login(self, email: str, password: str) -> None:
         """Complete login process.
@@ -131,7 +131,7 @@ class LoginPage(BasePage):
         except LoginError:
             raise
         except Exception as e:
-            raise LoginError(f"Login failed: {e}")
+            raise LoginError("Login failed") from e
 
     def is_logged_in(self) -> bool:
         """Check if user is currently logged in.

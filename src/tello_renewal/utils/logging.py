@@ -7,7 +7,7 @@ sensitive data redaction and easy configuration.
 import re
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -35,7 +35,7 @@ def _redact_sensitive_data(record: Any) -> bool:
     return True  # Always allow the record to be logged
 
 
-def configure_logging(config: Optional[LoggingConfig] = None) -> None:
+def configure_logging(config: LoggingConfig | None = None) -> None:
     """Configure logging using loguru.
 
     Args:

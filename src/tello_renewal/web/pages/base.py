@@ -5,7 +5,6 @@ functionality like element waiting, clicking strategies, and error handling.
 """
 
 import time
-from typing import Optional
 
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
@@ -34,7 +33,7 @@ class BasePage:
         self.wait = WebDriverWait(driver, timeout)
 
     def wait_for_element(
-        self, locator: Locator, timeout: Optional[int] = None
+        self, locator: Locator, timeout: int | None = None
     ) -> WebElement:
         """Wait for element to be present and return it.
 
@@ -80,10 +79,10 @@ class BasePage:
             raise ElementNotFoundError(
                 f"Element not found: {locator.description} "
                 f"(tried {1 + len(locator.fallbacks)} locators)"
-            )
+            ) from None
 
     def wait_for_clickable(
-        self, locator: Locator, timeout: Optional[int] = None
+        self, locator: Locator, timeout: int | None = None
     ) -> WebElement:
         """Wait for element to be clickable and return it.
 
@@ -107,8 +106,8 @@ class BasePage:
             return element
         except Exception as e:
             raise ElementNotFoundError(
-                f"Element not clickable: {locator.description} - {e}"
-            )
+                f"Element not clickable: {locator.description}"
+            ) from e
 
     def click_with_strategies(self, locator: Locator) -> bool:
         """Click element using multiple strategies for reliability.
@@ -191,8 +190,8 @@ class BasePage:
             return text
         except Exception as e:
             raise ElementNotFoundError(
-                f"Failed to get text from {locator.description}: {e}"
-            )
+                f"Failed to get text from {locator.description}"
+            ) from e
 
     def is_element_present(self, locator: Locator, timeout: int = 5) -> bool:
         """Check if element is present on page.
@@ -225,7 +224,7 @@ class BasePage:
             self.driver.get(url)
             logger.info(f"Navigated to: {url}")
         except Exception as e:
-            raise PageLoadError(f"Failed to navigate to {url}: {e}")
+            raise PageLoadError(f"Failed to navigate to {url}") from e
 
     def get_current_url(self) -> str:
         """Get current page URL.

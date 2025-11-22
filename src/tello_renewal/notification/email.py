@@ -9,7 +9,7 @@ import smtplib
 import ssl
 from datetime import date, timedelta
 from email.message import EmailMessage
-from typing import Any, List, Optional
+from typing import Any
 
 from ..core.models import AccountBalance, RenewalResult
 from ..utils.config import NotificationConfig, SmtpConfig
@@ -32,7 +32,7 @@ class EmailNotifier:
         """
         self.smtp_config = smtp_config
         self.notification_config = notification_config
-        self._server: Optional[smtplib.SMTP] = None
+        self._server: smtplib.SMTP | None = None
 
     def __enter__(self):
         """Context manager entry - establish SMTP connection."""
@@ -76,7 +76,7 @@ class EmailNotifier:
                 self._server = None
 
     def _create_message(
-        self, subject: str, body: str, recipients: List[str]
+        self, subject: str, body: str, recipients: list[str]
     ) -> EmailMessage:
         """Create email message.
 
