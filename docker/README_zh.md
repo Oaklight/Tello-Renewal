@@ -51,10 +51,10 @@
 
 ```bash
 # 构建基础镜像
-make docker-build-base
+make build-docker-base
 
 # 推送到 DockerHub
-make docker-push-base
+make push-docker-base
 ```
 
 #### 在其他项目中使用
@@ -103,13 +103,22 @@ CMD ["python", "your-app.py"]
 
 ```bash
 # 首先构建基础镜像
-make docker-build-base
+make build-docker-base
 
-# 构建应用镜像
-make docker-build
+# 构建应用镜像（自动检测版本）
+make build-docker
 
-# 或使用构建脚本
+# 或直接使用构建脚本
 ./scripts/build.sh
+
+# 使用指定版本构建
+make build-docker V=1.0.0
+
+# 使用 PyPI 镜像构建
+make build-docker MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 同时指定版本和镜像
+make build-docker V=1.0.0 MIRROR=https://mirrors.cernet.edu.cn/pypi/web/simple
 ```
 
 ### 2. 准备配置
@@ -229,6 +238,22 @@ project/
 | `TZ`          | `America/Chicago`         | 时区设置     |
 | `CONFIG_FILE` | `/app/config/config.toml` | 配置文件路径 |
 
+### Makefile 变量
+
+| 变量名   | 默认值                             | 说明                          |
+| -------- | ---------------------------------- | ----------------------------- |
+| `V`      | 从 PyPI 或 pyproject.toml 自动检测 | Docker 镜像版本标签           |
+| `MIRROR` | (空)                               | PyPI 镜像 URL，用于加速包安装 |
+
+#### 版本检测机制
+
+构建系统按以下顺序自动检测版本：
+
+1. **本地 wheel 文件** - 如果存在 `dist/*.whl`，使用 wheel 文件名中的版本
+2. **指定版本** - 如果指定了 `V=x.x.x`，使用该版本
+3. **PyPI 最新版** - 从 PyPI 获取最新版本
+4. **本地回退** - 如果 PyPI 不可用，使用 `pyproject.toml` 中的版本
+
 ### 配置文件示例
 
 ```toml
@@ -275,6 +300,7 @@ recipients = ["admin@example.com"]
    ```
 
 3. **权限问题**
+
    ```bash
    # 检查目录权限
    chmod 755 config logs
@@ -320,11 +346,12 @@ docker run -it --rm \
    ```
 
 4. **定期更新**
+
    ```bash
    # 更新镜像
    docker pull python:3.11-alpine
-   make docker-build-base
-   make docker-build
+   make build-docker-base
+   make build-docker
    ```
 
 ## 📊 监控和日志
@@ -359,12 +386,30 @@ htop
 ### 更新应用
 
 ```bash
-# 拉取最新镜像
-docker pull oaklight/tello-renewal:latest
+# 拉取最新基础镜像并重新构建
+docker pull python:3.11-alpine
+make build-docker-base
+make build-docker
+
+# 或更新到指定版本
+make build-docker V=1.2.0
 
 # 更新运行脚本
 curl -o run.sh https://raw.githubusercontent.com/Oaklight/Tello-Renewal/refs/heads/master/scripts/run.sh
 chmod +x run.sh
+```
+
+### 包管理
+
+```bash
+# 构建 Python 包
+make build-package
+
+# 推送包到 PyPI
+make push-package
+
+# 清理包构建文件
+make clean-package
 ```
 
 ### 备份配置
@@ -384,7 +429,7 @@ docker image prune
 docker system prune -a
 
 # 使用 Makefile 清理
-make docker-clean
+make clean-docker
 ```
 
 ## 📞 支持
