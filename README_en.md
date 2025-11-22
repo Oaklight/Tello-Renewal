@@ -266,7 +266,7 @@ For detailed Docker usage instructions, see [`docker/README_en.md`](docker/READM
 
 ```bash
 # Build and run with Docker
-make docker-build
+make build-docker
 docker run --rm -v $(pwd)/config:/app/config oaklight/tello-renewal:latest
 
 # Or use the provided scripts
@@ -277,15 +277,26 @@ docker run --rm -v $(pwd)/config:/app/config oaklight/tello-renewal:latest
 
 ```bash
 # Build base image (Alpine Python + Selenium + geckodriver)
-make docker-build-base
-make docker-push-base
+make build-docker-base
+make push-docker-base
 
 # Build application image
-make docker-build
-make docker-push
+make build-docker
+make push-docker
+
+# Build with specific version
+make build-docker V=1.0.0
+
+# Build with PyPI mirror
+make build-docker MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple
+
+# Package management
+make build-package
+make push-package
+make clean-package
 
 # Clean up
-make docker-clean
+make clean-docker
 ```
 
 ## Development

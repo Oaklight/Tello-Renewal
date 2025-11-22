@@ -266,7 +266,7 @@ tail -f tello_renewal.log
 
 ```bash
 # 使用 Docker 构建和运行
-make docker-build
+make build-docker
 docker run --rm -v $(pwd)/config:/app/config oaklight/tello-renewal:latest
 
 # 或使用提供的脚本
@@ -277,15 +277,26 @@ docker run --rm -v $(pwd)/config:/app/config oaklight/tello-renewal:latest
 
 ```bash
 # 构建基础镜像 (Alpine Python + Selenium + geckodriver)
-make docker-build-base
-make docker-push-base
+make build-docker-base
+make push-docker-base
 
 # 构建应用镜像
-make docker-build
-make docker-push
+make build-docker
+make push-docker
+
+# 使用指定版本构建
+make build-docker V=1.0.0
+
+# 使用 PyPI 镜像构建
+make build-docker MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 包管理
+make build-package
+make push-package
+make clean-package
 
 # 清理
-make docker-clean
+make clean-docker
 ```
 
 ## 开发
