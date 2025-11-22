@@ -95,7 +95,33 @@ class TelloLocators:
     )
 
     BALANCE_DETAILS = Locator(
-        By.CSS_SELECTOR, ".balance-details", "Balance details elements"
+        By.CSS_SELECTOR,
+        ".balance-details",
+        "Balance details elements",
+        fallbacks=[
+            Locator(By.CSS_SELECTOR, "div.balance-details", "Balance details (div)"),
+            Locator(
+                By.CSS_SELECTOR,
+                "[class*='balance-detail']",
+                "Balance details (partial class)",
+            ),
+            Locator(
+                By.CSS_SELECTOR,
+                "[class*='balance']",
+                "Balance elements (partial class)",
+            ),
+            Locator(By.CSS_SELECTOR, ".pack_card div", "Pack card child divs"),
+            Locator(
+                By.XPATH,
+                "//div[contains(@class, 'balance')]",
+                "Balance elements (xpath)",
+            ),
+            Locator(
+                By.XPATH,
+                "//div[contains(text(), 'GB') or contains(text(), 'minutes') or contains(text(), 'text')]",
+                "Usage elements by text content",
+            ),
+        ],
     )
 
     # Plan information elements
