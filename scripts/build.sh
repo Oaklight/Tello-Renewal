@@ -22,7 +22,14 @@ except Exception:
 		echo "$PYPI_VERSION"
 	else
 		# Fallback to pyproject.toml
-		python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"
+		python -c "
+try:
+	   import tomllib
+except ImportError:
+	   import tomli as tomllib
+with open('pyproject.toml', 'rb') as f:
+	   print(tomllib.load(f)['project']['version'])
+" 2>/dev/null || echo "0.1.2"
 	fi
 }
 
@@ -65,7 +72,7 @@ elif [ -n "$VERSION_ARG" ]; then
 	# When version is explicitly provided, pass it as build arg
 	BUILD_ARGS="--build-arg TELLO_VERSION=${VERSION}"
 else
-	VERSION=$(get_version)
+	# No local wheel and no version specified, check PyPI
 	PYPI_VERSION=$(python -c "
 import urllib.request
 import json
@@ -79,11 +86,21 @@ except Exception:
 " 2>/dev/null)
 
 	if [ -n "$PYPI_VERSION" ]; then
+		VERSION="$PYPI_VERSION"
 		echo "📦 Using latest PyPI version: $VERSION"
 		# Don't pass build arg, let Docker install latest from PyPI
 		BUILD_ARGS=""
 	else
-		echo "⚠️  PyPI not available, using local version: $VERSION"
+		# Fallback to local pyproject.toml version
+		VERSION=$(python -c "
+try:
+		  import tomllib
+except ImportError:
+		  import tomli as tomllib
+with open('pyproject.toml', 'rb') as f:
+		  print(tomllib.load(f)['project']['version'])
+" 2>/dev/null || echo "0.1.2")
+		echo "⚠️  PyPI not available, using local pyproject.toml version: $VERSION"
 		# Pass the local version as build arg
 		BUILD_ARGS="--build-arg TELLO_VERSION=${VERSION}"
 	fi

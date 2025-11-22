@@ -11,8 +11,15 @@ ARG PYPI_MIRROR
 # Switch to root to install package
 USER root
 
-# Copy local wheel file if specified
-COPY dist/ /tmp/dist/
+# Create temporary directory for potential local wheels
+RUN mkdir -p /tmp/dist/
+
+# Copy the entire project context and extract dist if it exists
+COPY . /tmp/build/
+RUN if [ -d "/tmp/build/dist" ] && [ "$(ls -A /tmp/build/dist 2>/dev/null)" ]; then \
+        cp /tmp/build/dist/*.whl /tmp/dist/ 2>/dev/null || true; \
+    fi && \
+    rm -rf /tmp/build/
 
 # Install the package - prioritize local wheel, then specific version, then latest from PyPI
 RUN if [ -n "$LOCAL_WHEEL" ] && [ -f "/tmp/dist/$LOCAL_WHEEL" ]; then \
