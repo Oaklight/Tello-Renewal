@@ -7,6 +7,7 @@ and renewal date retrieval using the Page Object Model pattern.
 import re
 from datetime import date, datetime
 
+from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 
@@ -67,12 +68,58 @@ class DashboardPage(BasePage):
             ElementNotFoundError: If balance elements not found
         """
         try:
+            # Debug: Print page source for analysis
+            logger.info(
+                "=== DEBUG: Analyzing page structure for balance extraction ==="
+            )
+            try:
+                page_source = self.driver.page_source
+                # Log a portion of the page source for debugging
+                logger.info(f"Page title: {self.driver.title}")
+                logger.info(f"Current URL: {self.driver.current_url}")
+
+                # Look for balance-related content in page source
+                import re
+
+                balance_patterns = [
+                    r"balance[^>]*>([^<]+)",
+                    r"remaining[^>]*>([^<]+)",
+                    r"\d+\.\d+\s*GB",
+                    r"\d+\s*minutes",
+                    r"unlimited\s*text",
+                    r"pack_card[^>]*>([^<]+)",
+                ]
+
+                for pattern in balance_patterns:
+                    matches = re.findall(pattern, page_source, re.IGNORECASE)
+                    if matches:
+                        logger.info(
+                            f"Found pattern '{pattern}': {matches[:5]}"
+                        )  # Show first 5 matches
+
+            except Exception as debug_error:
+                logger.warning(f"Debug analysis failed: {debug_error}")
+
             # Get account balance from pack_card structure
-            account_balance_amount = self._extract_account_balance()
+            try:
+                account_balance_amount = self._extract_account_balance()
+                logger.info(
+                    f"Successfully extracted account balance: ${account_balance_amount}"
+                )
+            except Exception as balance_error:
+                logger.error(f"Failed to extract account balance: {balance_error}")
+                raise
 
             if account_balance_amount is not None:
                 # Get usage data from balance-details elements
-                balance_details = self._get_balance_details()
+                try:
+                    balance_details = self._get_balance_details()
+                    logger.info(
+                        f"Successfully got {len(balance_details)} balance details elements"
+                    )
+                except Exception as details_error:
+                    logger.error(f"Failed to get balance details: {details_error}")
+                    raise
 
                 if len(balance_details) >= 2:
                     data_text = balance_details[0].text
@@ -261,8 +308,12 @@ class DashboardPage(BasePage):
                 *TelloLocators.BALANCE_PACK_CARDS.by_value_tuple()
             )
 
-            for card in pack_cards:
+            logger.debug(f"Found {len(pack_cards)} pack_card elements")
+
+            for i, card in enumerate(pack_cards):
                 card_text = card.text
+                logger.debug(f"Pack card {i + 1} text: {repr(card_text)}")
+
                 if "Remaining balance" in card_text:
                     logger.debug(f"Found balance card text: {card_text}")
 
@@ -274,14 +325,44 @@ class DashboardPage(BasePage):
                             f"Successfully extracted account balance: ${account_balance_amount}"
                         )
                         return account_balance_amount
+                    else:
+                        logger.warning(
+                            f"Found 'Remaining balance' but no $ amount match in: {repr(card_text)}"
+                        )
 
-            raise ElementNotFoundError("Could not find balance amount in pack cards")
+            # If no pack cards found or no balance, try alternative approaches
+            logger.warning(
+                "Could not find balance in pack cards, trying alternative methods"
+            )
+
+            # Try to find any element containing balance information
+            all_elements = self.driver.find_elements(
+                By.XPATH,
+                "//*[contains(text(), '$') and (contains(text(), 'balance') or contains(text(), 'Balance'))]",
+            )
+            logger.debug(f"Found {len(all_elements)} elements with $ and balance")
+
+            for elem in all_elements:
+                elem_text = elem.text
+                logger.debug(f"Balance element text: {repr(elem_text)}")
+                balance_match = re.search(r"\$(\d+(?:\.\d{2})?)", elem_text)
+                if balance_match:
+                    account_balance_amount = float(balance_match.group(1))
+                    logger.info(
+                        f"Extracted balance from alternative method: ${account_balance_amount}"
+                    )
+                    return account_balance_amount
+
+            raise ElementNotFoundError(
+                "Could not find balance amount in pack cards or alternative elements"
+            )
 
         except Exception as e:
+            logger.error(f"Exception in _extract_account_balance: {e}")
             raise ElementNotFoundError("Failed to extract account balance") from e
 
     def _get_balance_details(self) -> list[WebElement]:
-        """Get balance details elements.
+        """Get balance details elements with fallback strategies.
 
         Returns:
             List of balance details elements
@@ -290,11 +371,63 @@ class DashboardPage(BasePage):
             ElementNotFoundError: If balance details not found
         """
         try:
+            # Try primary locator first
             balance_details = self.driver.find_elements(
                 *TelloLocators.BALANCE_DETAILS.by_value_tuple()
             )
-            logger.debug(f"Found {len(balance_details)} balance-details elements")
-            return balance_details
+
+            if balance_details:
+                logger.debug(
+                    f"Found {len(balance_details)} balance-details elements using primary locator"
+                )
+                return balance_details
+
+            # Try fallback locators
+            for i, fallback in enumerate(TelloLocators.BALANCE_DETAILS.fallbacks):
+                try:
+                    balance_details = self.driver.find_elements(
+                        *fallback.by_value_tuple()
+                    )
+                    if balance_details:
+                        logger.info(
+                            f"Found {len(balance_details)} balance elements using fallback {i + 1}: {fallback.description}"
+                        )
+                        return balance_details
+                except Exception as fallback_error:
+                    logger.debug(f"Fallback {i + 1} failed: {fallback_error}")
+                    continue
+
+            # If no fallbacks work, try to find any elements with usage information
+            logger.warning(
+                "All balance locators failed, trying to find usage elements by content"
+            )
+            all_divs = self.driver.find_elements(By.TAG_NAME, "div")
+            usage_elements: list[WebElement] = []
+
+            for div in all_divs:
+                try:
+                    text = div.text.strip()
+                    if any(
+                        keyword in text.lower()
+                        for keyword in ["gb", "minutes", "text", "unlimited"]
+                    ):
+                        # Filter out very long text (likely not usage info)
+                        if len(text) < 50 and text:
+                            usage_elements.append(div)
+                            logger.debug(f"Found potential usage element: {text}")
+                except Exception:
+                    continue
+
+            if usage_elements:
+                logger.info(
+                    f"Found {len(usage_elements)} potential usage elements by content analysis"
+                )
+                # Return first 3 as they're likely data, minutes, texts
+                return usage_elements[:3]
+
+            raise ElementNotFoundError(
+                "Could not find balance details with any strategy"
+            )
 
         except Exception as e:
             raise ElementNotFoundError("Failed to get balance details") from e

@@ -122,7 +122,10 @@ def cmd_status(args: Args) -> None:
 
         # Update DUE_DATE cache since we retrieved the renewal date
         # This helps keep the cache fresh even when just checking status
-        engine.cache.write_cached_date(summary.renewal_date)
+        from ..utils.cache import DueDateCache
+
+        cache = DueDateCache(config.renewal.cache_file_path)
+        cache.write_cached_date(summary.renewal_date)
         logger.info(f"Updated DUE_DATE cache with renewal date: {summary.renewal_date}")
 
         print(f"Account: {summary.email}")
