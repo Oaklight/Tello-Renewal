@@ -7,7 +7,6 @@ import argparse
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Optional
 
 from .. import __version__
 from ..core.models import RenewalStatus
@@ -21,7 +20,7 @@ logger = get_logger(__name__)
 Args = argparse.Namespace
 
 
-def setup_logging_and_config(config_path: Optional[str], verbose: bool) -> Config:
+def setup_logging_and_config(config_path: str | None, verbose: bool) -> Config:
     """Set up logging and load configuration.
 
     Args:
@@ -66,7 +65,7 @@ def cmd_renew(args: Args) -> None:
         engine = RenewalEngine(config, dry_run=args.dry_run)
 
         # Execute renewal with force flag
-        result = engine.execute_renewal(force=getattr(args, 'force', False))
+        result = engine.execute_renewal(force=getattr(args, "force", False))
 
         # Send notifications if configured
         if config.notifications.email_enabled:
@@ -120,6 +119,11 @@ def cmd_status(args: Args) -> None:
     try:
         engine = RenewalEngine(config, dry_run=True)
         summary = engine.get_account_summary()
+
+        # Update DUE_DATE cache since we retrieved the renewal date
+        # This helps keep the cache fresh even when just checking status
+        engine.cache.write_cached_date(summary.renewal_date)
+        logger.info(f"Updated DUE_DATE cache with renewal date: {summary.renewal_date}")
 
         print(f"Account: {summary.email}")
         print(f"Renewal date: {summary.renewal_date}")
