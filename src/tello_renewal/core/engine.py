@@ -8,6 +8,7 @@ import time
 from datetime import date, datetime
 from typing import Any
 
+from ..utils.cache import DueDateCache
 from ..utils.config import Config
 from ..utils.exceptions import TelloRenewalError
 from ..utils.logging import get_logger, log_duration
@@ -30,6 +31,9 @@ class RenewalEngine:
         """
         self.config = config
         self.dry_run = dry_run or config.renewal.dry_run
+
+        # Initialize cache manager
+        self.cache = DueDateCache(config.renewal.cache_file_path)
 
         # Services will be initialized when web client is available
         self._account_service: AccountService | None = None
@@ -115,16 +119,36 @@ class RenewalEngine:
             logger.error(f"Failed to get account summary: {e}")
             raise TelloRenewalError("Failed to get account summary") from e
 
-    def execute_renewal(self) -> RenewalResult:
+    def execute_renewal(self, force: bool = False) -> RenewalResult:
         """Execute the complete renewal process.
+
+        Args:
+            force: If True, ignore cached due date and force renewal check
 
         Returns:
             Result of the renewal operation
         """
         start_time = time.time()
         timestamp = datetime.now()
+        current_date = datetime.now().date()
 
-        logger.info(f"Starting renewal process (dry_run={self.dry_run})")
+        logger.info(f"Starting renewal process (dry_run={self.dry_run}, force={force})")
+
+        # Check cache first unless force is True
+        if not force:
+            if self.cache.should_skip_renewal(
+                current_date, self.config.renewal.days_before_renewal
+            ):
+                cached_date = self.cache.read_cached_date()
+                message = f"Skipping renewal check - within {self.config.renewal.days_before_renewal} days of cached date {cached_date}"
+                logger.info(message)
+                duration = time.time() - start_time
+                return RenewalResult(
+                    status=RenewalStatus.SKIPPED,
+                    timestamp=timestamp,
+                    message=message,
+                    duration_seconds=duration,
+                )
 
         try:
             with TelloWebClient(self.config.browser, self.dry_run) as client:
@@ -139,6 +163,14 @@ class RenewalEngine:
 
                 # Get renewal date and check if renewal is needed
                 renewal_date = self.account_service.get_renewal_date()
+
+                # Update cache with the actual renewal date (unless dry run)
+                if not self.dry_run:
+                    self.cache.write_cached_date(renewal_date)
+                else:
+                    logger.info(
+                        f"Dry run mode - not updating cache with renewal date: {renewal_date}"
+                    )
 
                 if not self.account_service.check_renewal_needed(
                     renewal_date, self.config.renewal.days_before_renewal
