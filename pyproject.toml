@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tello-renewal"
-version = "0.2.0a0"
+version = "0.2.0"
 description = "Tello mobile plan automatic renewal system"
 readme = "README.md"
 license = { text = "MIT" }
