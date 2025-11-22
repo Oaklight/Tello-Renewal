@@ -8,7 +8,7 @@ import time
 from datetime import date, datetime
 from typing import Any
 
-from ..utils.cache import DueDateCache
+from ..utils.cache import DueDateCache, ExecutionStatus, ExecutionStatusCache
 from ..utils.config import Config
 from ..utils.exceptions import TelloRenewalError
 from ..utils.logging import get_logger, log_duration
@@ -32,8 +32,11 @@ class RenewalEngine:
         self.config = config
         self.dry_run = dry_run or config.renewal.dry_run
 
-        # Initialize cache manager
+        # Initialize cache managers
         self.cache = DueDateCache(config.renewal.cache_file_path)
+        self.exec_status_cache = ExecutionStatusCache(
+            config.renewal.exec_status_file_path
+        )
 
         # Services will be initialized when web client is available
         self._account_service: AccountService | None = None
@@ -216,6 +219,12 @@ class RenewalEngine:
 
                     logger.info(message)
 
+                    # Record success status (only if not dry run)
+                    if not self.dry_run:
+                        self.exec_status_cache.write_execution_status(
+                            ExecutionStatus.SUCCESS, timestamp
+                        )
+
                     return RenewalResult(
                         status=status,
                         timestamp=timestamp,
@@ -230,6 +239,11 @@ class RenewalEngine:
             duration = time.time() - start_time
             error_msg = str(e)
             logger.error(f"Renewal failed: {error_msg}")
+
+            # Record failure status
+            self.exec_status_cache.write_execution_status(
+                ExecutionStatus.FAILED, timestamp
+            )
 
             return RenewalResult(
                 status=RenewalStatus.FAILED,
