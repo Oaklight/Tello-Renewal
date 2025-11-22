@@ -65,8 +65,8 @@ def cmd_renew(args: Args) -> None:
         # Create renewal engine
         engine = RenewalEngine(config, dry_run=args.dry_run)
 
-        # Execute renewal
-        result = engine.execute_renewal()
+        # Execute renewal with force flag
+        result = engine.execute_renewal(force=getattr(args, 'force', False))
 
         # Send notifications if configured
         if config.notifications.email_enabled:
@@ -100,6 +100,8 @@ def cmd_renew(args: Args) -> None:
             sys.exit(0)
         elif result.status == RenewalStatus.NOT_DUE:
             sys.exit(6)  # Not due for renewal
+        elif result.status == RenewalStatus.SKIPPED:
+            sys.exit(7)  # Skipped due to cache
         elif result.status == RenewalStatus.FAILED:
             sys.exit(5)  # Renewal failed
         else:
@@ -266,6 +268,12 @@ def create_parser() -> argparse.ArgumentParser:
         "-d",
         action="store_true",
         help="Test renewal process without actually renewing",
+    )
+    renew_parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Force renewal ignoring cached due date (respects --dry-run)",
     )
     renew_parser.set_defaults(func=cmd_renew)
 
