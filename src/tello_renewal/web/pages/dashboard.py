@@ -144,18 +144,107 @@ class DashboardPage(BasePage):
             ElementNotFoundError: If renew button not found or not clickable
         """
         try:
-            success = self.click_with_strategies(TelloLocators.RENEW_BUTTON)
+            # First, ensure we're on the dashboard page
+            if not self.is_on_dashboard():
+                raise ElementNotFoundError(
+                    "Not on dashboard page - cannot click renew button"
+                )
+
+            # Get current URL for comparison
+            current_url = self.driver.current_url
+            logger.debug(f"Current URL before clicking renew button: {current_url}")
+
+            # Click the renew button with enhanced retry logic
+            success = self.click_with_strategies(
+                TelloLocators.RENEW_BUTTON, max_retries=5
+            )
+
             if success:
                 logger.info("Successfully clicked renew button")
-                # Wait a bit for page transition
-                import time
 
-                time.sleep(3)
+                # Wait for page transition with timeout
+                self._wait_for_page_transition(current_url, timeout=30)
+
+                # Verify we've navigated to renewal page
+                if self._is_on_renewal_page():
+                    logger.info("Successfully navigated to renewal page")
+                else:
+                    logger.warning(
+                        "Clicked renew button but may not be on renewal page"
+                    )
             else:
                 raise ElementNotFoundError("Failed to click renew button")
 
         except Exception as e:
+            logger.error(f"Failed to click renew button: {e}")
+            # Log current page state for debugging
+            try:
+                current_url = self.driver.current_url
+                page_title = self.driver.title
+                logger.debug(f"Current state - URL: {current_url}, Title: {page_title}")
+            except Exception:
+                pass
             raise ElementNotFoundError("Failed to click renew button") from e
+
+    def _wait_for_page_transition(self, original_url: str, timeout: int = 30) -> bool:
+        """Wait for page to transition from original URL.
+
+        Args:
+            original_url: The URL before clicking
+            timeout: Maximum time to wait for transition
+
+        Returns:
+            True if page transitioned, False if timeout
+        """
+        import time
+
+        start_time = time.time()
+
+        # Wait a bit for initial transition
+        time.sleep(2)
+
+        while time.time() - start_time < timeout:
+            try:
+                current_url = self.driver.current_url
+
+                # Check if URL has changed
+                if current_url != original_url:
+                    logger.debug(
+                        f"Page transition detected: {original_url} -> {current_url}"
+                    )
+                    return True
+
+                # Check if we can find renewal page elements
+                if self._is_on_renewal_page():
+                    logger.debug("Renewal page elements detected")
+                    return True
+
+                time.sleep(1)
+
+            except Exception as e:
+                logger.debug(f"Error during page transition wait: {e}")
+                time.sleep(1)
+
+        logger.warning(f"Page transition timeout after {timeout} seconds")
+        return False
+
+    def _is_on_renewal_page(self) -> bool:
+        """Check if we're on the renewal page.
+
+        Returns:
+            True if on renewal page, False otherwise
+        """
+        try:
+            # Check for renewal page specific elements
+            from ..elements.locators import TelloLocators
+
+            # Look for finalize order button (renewal page indicator)
+            return self.is_element_present(
+                TelloLocators.FINALIZE_ORDER_BUTTON, timeout=5
+            )
+
+        except Exception:
+            return False
 
     def _extract_account_balance(self) -> float | None:
         """Extract account balance amount from pack cards.

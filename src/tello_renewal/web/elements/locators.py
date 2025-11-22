@@ -60,7 +60,29 @@ class TelloLocators:
         By.CSS_SELECTOR, "span.card_text > span", "Renewal date display"
     )
 
-    RENEW_BUTTON = Locator(By.CSS_SELECTOR, "button#renew_plan", "Plan renewal button")
+    RENEW_BUTTON = Locator(
+        By.CSS_SELECTOR,
+        "button#renew_plan",
+        "Plan renewal button",
+        fallbacks=[
+            Locator(
+                By.CSS_SELECTOR,
+                "button[id*='renew']",
+                "Plan renewal button (id contains renew)",
+            ),
+            Locator(
+                By.CSS_SELECTOR,
+                "button[onclick*='renew']",
+                "Plan renewal button (onclick contains renew)",
+            ),
+            Locator(
+                By.XPATH,
+                "//button[contains(text(), 'Renew') or contains(text(), 'RENEW')]",
+                "Plan renewal button (text contains renew)",
+            ),
+            Locator(By.CSS_SELECTOR, "a[href*='renew']", "Plan renewal link"),
+        ],
+    )
 
     # Balance related elements - with fallback strategies
     BALANCE_PACK_CARDS = Locator(
