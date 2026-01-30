@@ -1,5 +1,9 @@
 # Tello-Renewal
 
+[![Docker Image Version](https://img.shields.io/docker/v/oaklight/tello-renewal?label=Docker&logo=docker)](https://hub.docker.com/r/oaklight/tello-renewal)
+[![PyPI version](https://badge.fury.io/py/tello-renewal.svg?icon=si%3Apython)](https://badge.fury.io/py/tello-renewal)
+[![GitHub version](https://badge.fury.io/gh/oaklight%2FTello-Renewal.svg?icon=si%3Agithub)](https://badge.fury.io/gh/oaklight%2FTello-Renewal)
+
 [English Version](README_en.md) | [中文版](README_zh.md)
 
 使用网页自动化技术的 Tello 手机套餐自动续费系统。
