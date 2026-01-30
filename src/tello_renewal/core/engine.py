@@ -13,6 +13,7 @@ from ..utils.cache import (
     ExecutionStatus,
     ExecutionStatusCache,
     RunStateCache,
+    get_chicago_time,
 )
 from ..utils.config import Config
 from ..utils.exceptions import TelloRenewalError
@@ -137,8 +138,12 @@ class RenewalEngine:
             Result of the renewal operation
         """
         start_time = time.time()
-        timestamp = datetime.now()
-        current_date = datetime.now().date()
+        # Use NTP-synchronized Chicago time for consistency
+        chicago_now = get_chicago_time()
+        timestamp = chicago_now.replace(tzinfo=None)  # Remove timezone for storage
+        current_date = chicago_now.date()
+
+        logger.debug(f"Using Chicago time: {chicago_now} (date: {current_date})")
 
         logger.info(f"Starting renewal process (dry_run={self.dry_run}, force={force})")
 
@@ -194,7 +199,7 @@ class RenewalEngine:
                 if cached_date != renewal_date:
                     self.cache.write_cached_date(renewal_date)
                     logger.info(
-                        f"Updated due_date cache with renewal date: {renewal_date}"
+                        f"Updated due_date cache: {cached_date} -> {renewal_date}"
                     )
                 else:
                     logger.debug(f"Due date cache already up to date: {renewal_date}")
@@ -202,7 +207,7 @@ class RenewalEngine:
                 if not self.account_service.check_renewal_needed(
                     renewal_date, self.config.renewal.days_before_renewal
                 ):
-                    days_until = (renewal_date - datetime.now().date()).days
+                    days_until = (renewal_date - current_date).days
                     message = f"Renewal not due yet. {days_until} days remaining until {renewal_date}"
 
                     if self.dry_run:

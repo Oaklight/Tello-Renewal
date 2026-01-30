@@ -6,6 +6,9 @@ renewal checks and avoid upstream bot detection.
 """
 
 import json
+import socket
+import struct
+import time as time_module
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -15,6 +18,21 @@ import pytz
 from .logging import get_logger
 
 logger = get_logger(__name__)
+
+
+# NTP Configuration
+# Using globally accessible NTP servers that work in China mainland and worldwide
+NTP_SERVERS = [
+    "time.cloudflare.com",
+    "time.apple.com",
+    "ntp.aliyun.com",
+    "time.aws.com",
+    "pool.ntp.org",
+    "time.windows.com",
+]
+NTP_PORT = 123
+NTP_TIMEOUT = 5  # seconds
+NTP_EPOCH_OFFSET = 2208988800  # Seconds between 1900 and 1970
 
 
 class ExecutionStatus:
@@ -204,14 +222,116 @@ class DueDateCache:
         return info
 
 
+def get_ntp_time(server: str, timeout: float = NTP_TIMEOUT) -> datetime | None:
+    """Get current time from an NTP server.
+
+    Args:
+        server: NTP server hostname
+        timeout: Socket timeout in seconds
+
+    Returns:
+        Current datetime in UTC, or None if failed
+    """
+    try:
+        # Create NTP request packet
+        # First byte: LI=0, VN=3, Mode=3 (client) -> 0x1B
+        ntp_packet = b"\x1b" + 47 * b"\0"
+
+        # Create UDP socket and send request
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(timeout)
+
+        try:
+            sock.sendto(ntp_packet, (server, NTP_PORT))
+            data, _ = sock.recvfrom(1024)
+        finally:
+            sock.close()
+
+        if len(data) < 48:
+            logger.debug(f"NTP response too short from {server}")
+            return None
+
+        # Extract transmit timestamp (bytes 40-47)
+        # NTP timestamp is seconds since 1900-01-01
+        ntp_time = struct.unpack("!I", data[40:44])[0]
+
+        # Convert to Unix timestamp (seconds since 1970-01-01)
+        unix_time = ntp_time - NTP_EPOCH_OFFSET
+
+        # Convert to datetime in UTC (using timezone-aware method)
+        utc_time = datetime.fromtimestamp(unix_time, tz=pytz.UTC)
+
+        logger.debug(f"Got NTP time from {server}: {utc_time}")
+        return utc_time
+
+    except TimeoutError:
+        logger.debug(f"NTP request to {server} timed out")
+        return None
+    except socket.gaierror as e:
+        logger.debug(f"DNS resolution failed for {server}: {e}")
+        return None
+    except OSError as e:
+        logger.debug(f"NTP request to {server} failed: {e}")
+        return None
+    except Exception as e:
+        logger.debug(f"Unexpected error getting NTP time from {server}: {e}")
+        return None
+
+
+def get_ntp_time_with_fallback() -> datetime | None:
+    """Try to get NTP time from multiple servers with fallback.
+
+    Returns:
+        Current datetime in UTC from NTP, or None if all servers failed
+    """
+    for server in NTP_SERVERS:
+        ntp_time = get_ntp_time(server)
+        if ntp_time is not None:
+            logger.info(f"Successfully got NTP time from {server}")
+            return ntp_time
+        # Small delay before trying next server
+        time_module.sleep(0.1)
+
+    logger.warning("All NTP servers failed, falling back to local time")
+    return None
+
+
 def get_chicago_time() -> datetime:
     """Get current time in Chicago timezone.
+
+    This function attempts to get accurate time from NTP servers first,
+    falling back to local system time if NTP is unavailable.
 
     Returns:
         Current datetime in America/Chicago timezone
     """
     chicago_tz = pytz.timezone("America/Chicago")
-    return datetime.now(chicago_tz)
+
+    # Try to get NTP time first
+    ntp_time = get_ntp_time_with_fallback()
+
+    if ntp_time is not None:
+        # Convert UTC NTP time to Chicago timezone
+        chicago_time = ntp_time.astimezone(chicago_tz)
+        logger.debug(f"Using NTP-synchronized Chicago time: {chicago_time}")
+        return chicago_time
+
+    # Fallback to local system time
+    local_time = datetime.now(chicago_tz)
+    logger.warning(f"Using local system time (NTP unavailable): {local_time}")
+    return local_time
+
+
+def get_chicago_date() -> date:
+    """Get current date in Chicago timezone.
+
+    This is a convenience function that returns just the date portion
+    of get_chicago_time().
+
+    Returns:
+        Current date in America/Chicago timezone
+    """
+    return get_chicago_time().date()
 
 
 class RunStateCache:
@@ -301,6 +421,10 @@ class RunStateCache:
     def should_skip_renewal(self, due_date: date, days_before: int) -> bool:
         """Determine if renewal should be skipped based on run state.
 
+        This method checks if a successful renewal has already been completed
+        within the current renewal window. The renewal window is defined as
+        the period from (due_date - days_before) to due_date.
+
         Args:
             due_date: The renewal due date
             days_before: Days before renewal to start attempting
@@ -321,7 +445,10 @@ class RunStateCache:
             )
             return False  # Outside window, don't skip
 
-        logger.info(f"In renewal window: {days_until_renewal} days until renewal")
+        logger.info(
+            f"In renewal window: {days_until_renewal} days until renewal "
+            f"(current_date={current_date}, due_date={due_date})"
+        )
 
         # Check run state
         state_info = self.read_run_state()
@@ -329,29 +456,42 @@ class RunStateCache:
             logger.info("No run state found, should attempt renewal")
             return False
 
-        # Check if the state is from today (Chicago time)
         state_date = state_info["date"].date()
-        if state_date != current_date:
-            logger.info(
-                f"Run state is from {state_date}, not today ({current_date}), should attempt renewal"
-            )
-            return False
+        state_success = state_info["success"]
+        state_dry = state_info["dry"]
 
-        # If we had a successful renewal today, skip
-        if state_info["success"] and not state_info["dry"]:
-            logger.info("Renewal was successful today (not dry run), skipping")
-            return True
+        logger.debug(
+            f"Run state: date={state_date}, success={state_success}, dry={state_dry}"
+        )
+
+        # Calculate the start of the current renewal window
+        window_start = due_date - __import__("datetime").timedelta(days=days_before)
+
+        # Check if we had a successful (non-dry) renewal within the current window
+        if state_success and not state_dry:
+            if window_start <= state_date <= current_date:
+                logger.info(
+                    f"Renewal was successful on {state_date} within current window "
+                    f"({window_start} to {current_date}), skipping"
+                )
+                return True
+            else:
+                logger.info(
+                    f"Previous successful renewal on {state_date} is outside current window "
+                    f"({window_start} to {current_date}), should attempt renewal"
+                )
+                return False
 
         # If it was a dry run success, we can retry with real run
-        if state_info["success"] and state_info["dry"]:
+        if state_success and state_dry:
             logger.info(
                 "Previous attempt was successful dry run, should attempt real renewal"
             )
             return False
 
         # If it failed, we can retry
-        if not state_info["success"]:
-            logger.info("Previous attempt failed, should retry")
+        if not state_success:
+            logger.info(f"Previous attempt on {state_date} failed, should retry")
             return False
 
         # Default to not skip
