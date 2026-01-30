@@ -5,7 +5,7 @@ PACKAGE_NAME := tello-renewal
 DIST_DIR := dist
 DOCKER_IMAGE := oaklight/tello-renewal
 BASE_IMAGE := oaklight/alpine-python-gecko
-VERSION := $(shell python -c "import urllib.request, json; response = urllib.request.urlopen('https://pypi.org/pypi/$(PACKAGE_NAME)/json'); data = json.loads(response.read()); print(data['info']['version'])" 2>/dev/null || python -c "try:\n    import tomllib\nexcept ImportError:\n    import tomli as tomllib\nwith open('pyproject.toml', 'rb') as f:\n    print(tomllib.load(f)['project']['version'])" 2>/dev/null || echo "0.1.2")
+VERSION := $(shell python -c "from tello_renewal import __version__; print(__version__)" 2>/dev/null || python -c "import urllib.request, json; response = urllib.request.urlopen('https://pypi.org/pypi/$(PACKAGE_NAME)/json'); data = json.loads(response.read()); print(data['info']['version'])" 2>/dev/null || echo "0.2.1")
 
 # Optional variables
 V ?= $(VERSION)

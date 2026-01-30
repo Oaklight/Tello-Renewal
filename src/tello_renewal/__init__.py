@@ -1,6 +1,6 @@
 """Tello mobile plan automatic renewal system."""
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __author__ = "Oaklight"
 __email__ = "oaklight@gmx.com"
 __description__ = "Tello mobile plan automatic renewal system"
