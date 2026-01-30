@@ -36,6 +36,7 @@ with open('pyproject.toml', 'rb') as f:
 # Parse command line arguments
 VERSION_ARG=""
 PYPI_MIRROR=""
+REGISTRY_MIRROR="docker.io"
 
 while [[ $# -gt 0 ]]; do
 	case $1 in
@@ -45,6 +46,14 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--mirror=*)
 		PYPI_MIRROR="${1#*=}"
+		shift
+		;;
+	--registry-mirror)
+		REGISTRY_MIRROR="$2"
+		shift 2
+		;;
+	--registry-mirror=*)
+		REGISTRY_MIRROR="${1#*=}"
 		shift
 		;;
 	*)
@@ -112,6 +121,12 @@ if [ -n "$PYPI_MIRROR" ]; then
 	echo "🌐 Using PyPI mirror: $PYPI_MIRROR"
 fi
 
+# Add registry mirror to build args
+BUILD_ARGS="$BUILD_ARGS --build-arg REGISTRY_MIRROR=${REGISTRY_MIRROR}"
+if [ "$REGISTRY_MIRROR" != "docker.io" ]; then
+	echo "🐳 Using registry mirror: $REGISTRY_MIRROR"
+fi
+
 IMAGE_NAME="oaklight/tello-renewal"
 
 echo "🐳 Building Tello Renewal Docker image..."
@@ -139,6 +154,7 @@ echo "  ./scripts/build.sh                                    # Build latest ver
 echo "  ./scripts/build.sh 1.0.0                             # Build specific version"
 echo "  ./scripts/build.sh --mirror https://pypi.tuna.tsinghua.edu.cn/simple"
 echo "  ./scripts/build.sh 1.0.0 --mirror https://mirrors.cernet.edu.cn/pypi/web/simple"
+echo "  ./scripts/build.sh --registry-mirror docker.1ms.run  # Use Docker registry mirror"
 echo ""
 echo "Next steps:"
 echo "1. Create config directory: mkdir -p config logs"

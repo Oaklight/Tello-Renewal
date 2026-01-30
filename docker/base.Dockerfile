@@ -1,6 +1,7 @@
 # Base image with Alpine Python, Firefox, and geckodriver
 # This can be reused across multiple projects that need web automation
-FROM python:3.11-alpine
+ARG REGISTRY_MIRROR=docker.io
+FROM ${REGISTRY_MIRROR}/python:3.11-alpine
 
 LABEL maintainer="oaklight"
 LABEL description="Alpine Python base image with Firefox and geckodriver for web automation"

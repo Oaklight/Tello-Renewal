@@ -12,6 +12,7 @@ VERSION := $(shell python -c "from tello_renewal import __version__; print(__ver
 # Optional variables
 V ?= $(VERSION)
 MIRROR ?=
+REGISTRY_MIRROR ?= docker.io
 
 # Build the Python package
 build-package: clean-package
@@ -34,7 +35,10 @@ clean-package:
 # Build base Docker image
 build-docker-base:
 	@echo "Building base Docker image $(BASE_IMAGE):latest..."
-	docker build -f docker/base.Dockerfile -t $(BASE_IMAGE):latest .
+	@echo "Using registry mirror: $(REGISTRY_MIRROR)"
+	docker build -f docker/base.Dockerfile \
+		--build-arg REGISTRY_MIRROR=$(REGISTRY_MIRROR) \
+		-t $(BASE_IMAGE):latest .
 	@echo "Base Docker image built successfully."
 
 # Push base Docker image to DockerHub
@@ -46,14 +50,15 @@ push-docker-base:
 # Build Docker image
 build-docker:
 	@echo "Building Docker image $(DOCKER_IMAGE):$(V)..."
+	@echo "Using registry mirror: $(REGISTRY_MIRROR)"
 	@if [ ! -d "$(DIST_DIR)" ] || [ -z "$$(ls -A $(DIST_DIR) 2>/dev/null)" ]; then \
 		echo "No local distribution found, will install from PyPI"; \
 	fi
 	@if [ -n "$(MIRROR)" ]; then \
 		echo "Using PyPI mirror: $(MIRROR)"; \
-		./scripts/build.sh $(V) --mirror $(MIRROR); \
+		./scripts/build.sh $(V) --mirror $(MIRROR) --registry-mirror $(REGISTRY_MIRROR); \
 	else \
-		./scripts/build.sh $(V); \
+		./scripts/build.sh $(V) --registry-mirror $(REGISTRY_MIRROR); \
 	fi
 	@echo "Docker image built successfully."
 
@@ -96,7 +101,9 @@ help:
 	@echo "  make build-docker V=1.0.0 MIRROR=https://mirrors.cernet.edu.cn/pypi/web/simple"
 	@echo ""
 	@echo "Variables:"
-	@echo "  V=<version>    - Specify version (default: auto-detected)"
-	@echo "  MIRROR=<url>   - Specify PyPI mirror URL"
+	@echo "  V=<version>         - Specify version (default: auto-detected)"
+	@echo "  MIRROR=<url>        - Specify PyPI mirror URL"
+	@echo "  REGISTRY_MIRROR=<host> - Docker registry mirror (default: docker.io)"
+	@echo "                        Example: REGISTRY_MIRROR=docker.1ms.run make build-docker"
 
 .PHONY: build-package push-package clean-package build-docker-base push-docker-base build-docker push-docker clean-docker help

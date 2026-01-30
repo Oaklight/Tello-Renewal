@@ -1,5 +1,6 @@
 # Use our base image directly
-FROM oaklight/alpine-python-gecko:latest
+ARG REGISTRY_MIRROR=docker.io
+FROM ${REGISTRY_MIRROR}/oaklight/alpine-python-gecko:latest
 
 # Accept version as build argument - defaults to empty which will install latest from PyPI
 ARG TELLO_VERSION
