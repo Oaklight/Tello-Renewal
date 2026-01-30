@@ -248,6 +248,31 @@ class RenewalEngine:
 
                     logger.info(message)
 
+                    # After successful renewal, try to get the new renewal date
+                    # using the same session to avoid triggering bot detection
+                    if not self.dry_run:
+                        try:
+                            # Navigate back to dashboard to get updated renewal date
+                            logger.info(
+                                "Fetching updated renewal date after successful renewal"
+                            )
+                            new_renewal_date = self.account_service.get_renewal_date()
+                            if new_renewal_date != renewal_date:
+                                self.cache.write_cached_date(new_renewal_date)
+                                logger.info(
+                                    f"Updated due_date cache after renewal: "
+                                    f"{renewal_date} -> {new_renewal_date}"
+                                )
+                            else:
+                                logger.debug(
+                                    f"Renewal date unchanged after renewal: {new_renewal_date}"
+                                )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to fetch updated renewal date: {e}. "
+                                "Will update on next run."
+                            )
+
                     # Record success status in new run state cache
                     self.run_state_cache.write_run_state(
                         success=True, dry=self.dry_run, timestamp=timestamp
